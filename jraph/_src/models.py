@@ -33,19 +33,20 @@ NodeFeatures = EdgeFeatures = SenderFeatures = ReceiverFeatures = Globals = Arra
 # Signature:
 # (edges of each node to be aggregated, segment ids, number of segments) ->
 # aggregated edges
-AggregateEdgesToNodesFn = Callable[[EdgeFeatures, jnp.ndarray, int], ArrayTree]
+AggregateEdgesToNodesFn = Callable[
+    [EdgeFeatures, jnp.ndarray, int], NodeFeatures]
 
 # Signature:
 # (nodes of each graph to be aggregated, segment ids, number of segments) ->
 # aggregated nodes
 AggregateNodesToGlobalsFn = Callable[[NodeFeatures, jnp.ndarray, int],
-                                     NodeFeatures]
+                                     Globals]
 
 # Signature:
 # (edges of each graph to be aggregated, segment ids, number of segments) ->
 # aggregated edges
 AggregateEdgesToGlobalsFn = Callable[[EdgeFeatures, jnp.ndarray, int],
-                                     EdgeFeatures]
+                                     Globals]
 
 # Signature:
 # (edge features, sender node features, receiver node features, globals) ->
