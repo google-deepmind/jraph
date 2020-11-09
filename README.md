@@ -7,8 +7,12 @@ models.
 
 ## Getting Started
 
-The best place to start are the examples: `ogb_examples` provides an end to
+The best place to start are the examples. In particular:
+
+*  `examples/basic.py` provides an introduction to the features of the library.
+*  `ogb_examples/train.py` provides an end to
 end example of training a `GraphNet` on `molhiv` Open Graph Benchmark dataset.
+
 The rest of the examples are short scripts demonstrating how to use various
 models from our model zoo.
 
@@ -29,3 +33,10 @@ graph neural networks.
     message passing. These are designed to be lightweight, easy to fork and
     adapt. They do not manage parameters for you - for that, consider using
     `haiku` or `flax`. See the examples for more details.
+
+## Installation
+
+Jraph can be installed directly from github using the following command:
+
+```pip install git+git://github.com/deepmind/jraph.git```
+
