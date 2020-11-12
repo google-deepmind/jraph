@@ -145,7 +145,7 @@ def network_definition(
   gn = jraph.RelationNetwork(
       update_edge_fn=update_edge_fn,
       update_global_fn=hk.nets.MLP([2]),
-      aggregate_edges_for_globals_fn=jraph.segment_sum,
+      aggregate_edges_for_globals_fn=jax.ops.segment_sum,
       )
   graph = gn(graph)
 

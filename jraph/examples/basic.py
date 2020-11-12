@@ -25,6 +25,9 @@ import jax.numpy as jnp
 import jraph
 import numpy as np
 
+MASK_BROKEN_MSG = ("Support for jax.mask is currently broken. This is not a "
+                   "jraph error.")
+
 
 def run():
   """Runs basic example."""
@@ -163,7 +166,7 @@ def run():
   # attention function calculates the new edge feature given the weights.
   # We don't use graph attention here, and just pass the defaults.
   attention_logit_fn = None
-  attention_reduce_fn = jnp.multiply
+  attention_reduce_fn = None
 
   # Creates a new GraphNetwork in its most general form.
   # Most of the arguments have defaults and can be omitted if a feature
@@ -213,8 +216,8 @@ def run():
     updated_graph = propagation_fn([explicitly_batched_graph], logical_env)
     logging.info("Updated graph from explicitly batched graph %r",
                  updated_graph)
-  except Exception as e:  # pylint: disable=broad-except
-    logging.exception("Support for jax.mask is broken. %s", e)
+  except Exception:  # pylint: disable=broad-except
+    logging.warning(MASK_BROKEN_MSG)
 
   # JIT-compile graph propagation.
   # Use padded graphs to avoid re-compilation at every step!
@@ -229,8 +232,10 @@ def run():
         [explicitly_batched_graph], logical_env)
     logging.info("(JIT) Updated graph from explicitly batched graph %r",
                  updated_graph)
-  except Exception as e:  # pylint: disable=broad-except
-    logging.exception("Support for jax.mask is broken. %s", e)
+  except Exception:  # pylint: disable=broad-except
+    logging.warning(MASK_BROKEN_MSG)
+
+  logging.info("basic.py complete!")
 
 
 def main(argv):

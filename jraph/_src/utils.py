@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utilities for working with GraphsTuples."""
+"""Utilities for working with `GraphsTuple`s."""
 
 import functools
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Union
@@ -57,7 +57,7 @@ def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
   """Returns a batched graph given a list of graphs.
 
   This method will concatenate the `nodes`, `edges` and `globals`, `n_node` and
-  `n_edge` of a sequence of `GraphsTuples` along axis 0. For `senders` and
+  `n_edge` of a sequence of `GraphsTuple` along axis 0. For `senders` and
   `receivers`, offsets are computed so that connectivity remains valid for the
   new node indices.
 
@@ -104,7 +104,7 @@ def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
   version of graph_nets.
 
   Args:
-    graphs: sequence of GraphsTuples which will be batched into a single graph.
+    graphs: sequence of `GraphsTuple` which will be batched into a single graph.
   """
   return _batch(graphs, np_=jnp)
 
@@ -196,7 +196,7 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
     graph: `GraphsTuple` padded with dummy graph and empty graphs.
     n_node: the number of nodes in the padded `GraphsTuple`.
     n_edge: the number of edges in the padded `GraphsTuple`.
-    n_graph: the number of graphs in the padded `GraphsTuplea. Default is 2,
+    n_graph: the number of graphs in the padded `GraphsTuple`. Default is 2,
       which is the lowest possible value, because we always have at least one
       graph in the original `GraphsTuple` and we need one dummy graph for the
       padding.
@@ -222,9 +222,12 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
 
   pad_n_empty_graph = pad_n_graph - 1
 
-  tree_nodes_pad = lambda leaf: np.zeros((pad_n_node,) + leaf.shape[1:])
-  tree_edges_pad = lambda leaf: np.zeros((pad_n_edge,) + leaf.shape[1:])
-  tree_globs_pad = lambda leaf: np.zeros((pad_n_graph,) + leaf.shape[1:])
+  tree_nodes_pad = (
+      lambda leaf: np.zeros((pad_n_node,) + leaf.shape[1:], dtype=leaf.dtype))
+  tree_edges_pad = (
+      lambda leaf: np.zeros((pad_n_edge,) + leaf.shape[1:], dtype=leaf.dtype))
+  tree_globs_pad = (
+      lambda leaf: np.zeros((pad_n_graph,) + leaf.shape[1:], dtype=leaf.dtype))
 
   padding_graph = gn_graph.GraphsTuple(
       n_node=np.concatenate([np.array([pad_n_node]),
@@ -305,7 +308,7 @@ def unpad_with_graphs(
   is data-dependent!
 
   Args:
-    padded_graph: gn_graph.GraphsTuple padded with a dummy graph
+    padded_graph: `GraphsTuple` padded with a dummy graph
       and empty graphs.
 
   Returns:
@@ -331,52 +334,59 @@ def unpad_with_graphs(
 def get_node_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the nodes of a padded graph.
 
-  The mask contains 1 for a real node, and 0 for a padding nodes.
-
   Args:
-    padded_graph: gn_graph.GraphsTuple padded using `pad_with_graphs`.
+    padded_graph: `GraphsTuple` padded using `pad_with_graphs`. This
+        graph must contain at least one array of node features so the total
+        static number of nodes can be inferred statically from the shape, and
+        the method can be jitted.
+
+  Returns:
+    Boolean array of shape [total_num_nodes] containing True for real nodes,
+    and False for padding nodes.
   """
   n_padding_node = get_number_of_padding_with_graphs_nodes(padded_graph)
+  flat_node_features = tree.tree_leaves(padded_graph.nodes)
 
-  def _tree_get_mask(leaf):
-    n_valid_node = leaf.shape[0] - n_padding_node
-    return jnp.arange(leaf.shape[0], dtype=jnp.int32) < n_valid_node
-
-  return tree.tree_map(_tree_get_mask, padded_graph.nodes)
+  if not flat_node_features:
+    raise ValueError(
+        '`padded_graph` must have at least one array of node features')
+  total_num_nodes = flat_node_features[0].shape[0]
+  return _get_mask(padding_length=n_padding_node, full_length=total_num_nodes)
 
 
 def get_edge_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the edges of a padded graph.
 
-  The mask contains 1 for a real edge, and 0 for a padding edge.
-
   Args:
-    padded_graph: gn_graph.GraphsTuple padded using `pad_with_graphs`.
+    padded_graph: `GraphsTuple` padded using `pad_with_graphs`.
+
+  Returns:
+    Boolean array of shape [total_num_edges] containing True for real edges,
+    and False for padding edges.
   """
   n_padding_edge = get_number_of_padding_with_graphs_edges(padded_graph)
-
-  def _tree_get_mask(leaf):
-    n_valid_edge = leaf.shape[0] - n_padding_edge
-    return jnp.arange(leaf.shape[0], dtype=jnp.int32) < n_valid_edge
-
-  return tree.tree_map(_tree_get_mask, padded_graph.edges)
+  total_num_edges = padded_graph.senders.shape[0]
+  return _get_mask(padding_length=n_padding_edge, full_length=total_num_edges)
 
 
 def get_graph_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the graphs of a padded graph.
 
-  The mask contains 1 for a real graph, and 0 for a padding graph.
-
   Args:
-    padded_graph: gn_graph.GraphsTuple padded using `pad_with_graphs`.
+    padded_graph: `GraphsTuple` padded using `pad_with_graphs`.
+
+  Returns:
+    Boolean array of shape [total_num_graphs] containing True for real graphs,
+    and False for padding graphs.
   """
   n_padding_graph = get_number_of_padding_with_graphs_graphs(padded_graph)
+  total_num_graphs = padded_graph.n_node.shape[0]
+  return _get_mask(padding_length=n_padding_graph, full_length=total_num_graphs)
 
-  def _tree_get_mask(leaf):
-    n_valid_graph = leaf.shape[0] - n_padding_graph
-    return jnp.arange(leaf.shape[0], dtype=jnp.int32) < n_valid_graph
 
-  return tree.tree_map(_tree_get_mask, padded_graph.globals)
+def _get_mask(padding_length, full_length):
+  valid_length = full_length - padding_length
+  return jnp.arange(full_length, dtype=jnp.int32) < valid_length
 
 
 def concatenated_args(

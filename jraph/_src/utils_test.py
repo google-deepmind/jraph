@@ -212,12 +212,15 @@ class GraphTest(test_util.JaxTestCase):
                                 jnp.array([3, 0])]),
         n_edge=jnp.concatenate([graphs_tuple.n_edge,
                                 jnp.array([4, 0])]),
-        nodes=tree.tree_map(lambda f: jnp.concatenate([f, jnp.zeros((3, 2))]),
-                            graphs_tuple.nodes),
-        edges=tree.tree_map(lambda f: jnp.concatenate([f, jnp.zeros((4, 3))]),
-                            graphs_tuple.edges),
-        globals=tree.tree_map(lambda f: jnp.concatenate([f, jnp.zeros((2, 2))]),
-                              graphs_tuple.globals),
+        nodes=tree.tree_map(
+            lambda f: jnp.concatenate([f, jnp.zeros((3, 2), dtype=f.dtype)]),
+            graphs_tuple.nodes),
+        edges=tree.tree_map(
+            lambda f: jnp.concatenate([f, jnp.zeros((4, 3), dtype=f.dtype)]),
+            graphs_tuple.edges),
+        globals=tree.tree_map(
+            lambda f: jnp.concatenate([f, jnp.zeros((2, 2), dtype=f.dtype)]),
+            graphs_tuple.globals),
         senders=jnp.concatenate([graphs_tuple.senders,
                                  jnp.array([7, 7, 7, 7])]),
         receivers=jnp.concatenate(
@@ -307,38 +310,35 @@ class GraphTest(test_util.JaxTestCase):
   def test_get_node_padding_mask(self):
     """Tests construction of node padding mask."""
     _, graphs_tuple = self._get_list_and_batched_graph()
-    m = jnp.array([1, 1, 1, 1, 1, 0, 0], dtype=jnp.int32)
-    expected_mask = {'a': m, 'b': [m, {'c': m}]}
+    expected_mask = jnp.array([1, 1, 1, 1, 1, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_node_padding_mask(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_node_padding_mask)(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
 
   def test_get_edge_padding_mask(self):
     """Tests construction of edge padding mask."""
     _, graphs_tuple = self._get_list_and_batched_graph()
-    m = jnp.array([1, 1, 1, 1, 1, 1, 1, 0], dtype=jnp.int32)
-    expected_mask = {'a': m, 'b': [m, {'c': m}]}
+    expected_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_edge_padding_mask(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_edge_padding_mask)(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
 
   def test_get_graph_padding_mask(self):
     """Tests construction of graph padding mask."""
     _, graphs_tuple = self._get_list_and_batched_graph()
-    m = jnp.array([1, 1, 1, 1, 0, 0, 0], dtype=jnp.int32)
-    expected_mask = {'a': m, 'b': [m, {'c': m}]}
+    expected_mask = jnp.array([1, 1, 1, 1, 0, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_graph_padding_mask(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_graph_padding_mask)(graphs_tuple)
-      self.assertAllClose(mask, expected_mask, check_dtypes=False)
+      self.assertArraysEqual(mask, expected_mask)
 
   def test_segment_sum(self):
     result = utils.segment_sum(
