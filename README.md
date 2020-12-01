@@ -1,3 +1,5 @@
+
+![logo](images/logo.png)
 # Jraph - A library for graph neural networks in jax.
 
 Jraph (pronounced giraffe) is a lightweight library for working with graph
