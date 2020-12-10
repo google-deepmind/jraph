@@ -35,7 +35,7 @@ as (0, 1). The edges are one-hot encoded with (1, 0) if the literal should be
 true and (0, 1) if the literal should be false.
 
 The graph neural network encodes the nodes and the edges and runs multiple
-message passing steps by calculting message for each edge and aggregating
+message passing steps by calculating message for each edge and aggregating
 all the messages of the nodes.
 
 The training dataset consists of randomly generated 2-sat problems with 2 to 15

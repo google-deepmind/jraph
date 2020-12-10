@@ -18,7 +18,7 @@ Here we train a graph neural network to process Zachary's karate club.
 https://en.wikipedia.org/wiki/Zachary%27s_karate_club
 
 Zachary's karate club is used in the literature as an example of a social graph.
-Here we we a graphnet to optimize the assignments of the students in the
+Here we use a graphnet to optimize the assignments of the students in the
 karate club to two distinct karate instructors (Mr. Hi and John A).
 """
 
