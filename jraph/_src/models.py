@@ -86,15 +86,24 @@ def GraphNetwork(
     attention_reduce_fn: Optional[AttentionReduceFn] = None):
   """Returns a method that applies a configured GraphNetwork.
 
-  Example usage:
+  This implementation follows Algorithm 1 in
+  https://arxiv.org/pdf/1806.01261.pdf
 
-    ```
+  There is one difference. For the nodes update the class aggregates over the
+  sender edges and receiver edges separately. This is a bit more general
+  the algorithm described in the paper. The original behaviour can be
+  recovered by using only the receiver edge aggregations for the update.
+
+  In addition this implementation supports softmax attention over incoming
+  edge features.
+
+  Example usage::
+
     gn = GraphNetwork(update_edge_function,
     update_node_function, **kwargs)
     # Conduct multiple rounds of message passing with the same parameters:
     for _ in range(num_message_passing_steps):
       graph = gn(graph)
-    ```
 
   Args:
     update_edge_fn: function used to update the edges or None to deactivate edge
@@ -135,7 +144,6 @@ def GraphNetwork(
 
     In addition this implementation supports softmax attention over incoming
     edge features.
-
 
     Many popular Graph Neural Networks can be implemented as special cases of
     GraphNets, for more information please see the paper.

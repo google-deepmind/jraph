@@ -56,55 +56,55 @@ def segment_mean(values, segment_indices, n_segments):
 def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
   """Returns a batched graph given a list of graphs.
 
-  This method will concatenate the `nodes`, `edges` and `globals`, `n_node` and
-  `n_edge` of a sequence of `GraphsTuple` along axis 0. For `senders` and
-  `receivers`, offsets are computed so that connectivity remains valid for the
-  new node indices.
+  This method will concatenate the ``nodes``, ``edges`` and ``globals``,
+  ``n_node`` and ``n_edge`` of a sequence of ``GraphsTuple`` along axis 0. For
+  ``senders`` and ``receivers``, offsets are computed so that connectivity
+  remains valid for the new node indices.
 
-  For example:
-  ```
-  key = jax.random.PRNGKey(0)
-  graph_1 = GraphsTuple(nodes=jax.random.normal(key, (3, 64)),
-                    edges=jax.random.normal(key, (5, 64)),
-                    senders=jnp.array([0,0,1,1,2]),
-                    receivers=[1,2,0,2,1],
-                    n_node=jnp.array([3]),
-                    n_edge=jnp.array([5]),
-                    globals=jax.random.normal(key, (1, 64)))
-  graph_2 = GraphsTuple(nodes=jax.random.normal(key, (5, 64)),
-                    edges=jax.random.normal(key, (10, 64)),
-                    senders=jnp.array([0,0,1,1,2,2,3,3,4,4]),
-                    receivers=jnp.array([1,2,0,2,1,0,2,1,3,2]),
-                    n_node=jnp.array([5]),
-                    n_edge=jnp.array([10]),
-                    globals=jax.random.normal(key, (1, 64)))
-  batch = graph.batch([graph_1, graph_2])
+  For example::
 
-  batch.nodes.shape
-  >> (8, 64)
-  batch.edges.shape
-  >> (15, 64)
-  # Offsets computed on senders and receivers
-  batch.senders
-  >> DeviceArray([0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7], dtype=int32)
-  batch.receivers
-  >> DeviceArray([1, 2, 0, 2, 1, 4, 5, 3, 5, 4, 3, 5, 4, 6, 5], dtype=int32)
-  batch.n_node
-  >> DeviceArray([3, 5], dtype=int32)
-  batch.n_edge
-  >> DeviceArray([5, 10], dtype=int32)
-  ```
+    key = jax.random.PRNGKey(0)
+    graph_1 = GraphsTuple(nodes=jax.random.normal(key, (3, 64)),
+                      edges=jax.random.normal(key, (5, 64)),
+                      senders=jnp.array([0,0,1,1,2]),
+                      receivers=[1,2,0,2,1],
+                      n_node=jnp.array([3]),
+                      n_edge=jnp.array([5]),
+                      globals=jax.random.normal(key, (1, 64)))
+    graph_2 = GraphsTuple(nodes=jax.random.normal(key, (5, 64)),
+                      edges=jax.random.normal(key, (10, 64)),
+                      senders=jnp.array([0,0,1,1,2,2,3,3,4,4]),
+                      receivers=jnp.array([1,2,0,2,1,0,2,1,3,2]),
+                      n_node=jnp.array([5]),
+                      n_edge=jnp.array([10]),
+                      globals=jax.random.normal(key, (1, 64)))
+    batch = graph.batch([graph_1, graph_2])
 
-  If a `GraphsTuple` does not contain any graphs, it will be dropped from the
+    batch.nodes.shape
+    >> (8, 64)
+    batch.edges.shape
+    >> (15, 64)
+    # Offsets computed on senders and receivers
+    batch.senders
+    >> DeviceArray([0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7], dtype=int32)
+    batch.receivers
+    >> DeviceArray([1, 2, 0, 2, 1, 4, 5, 3, 5, 4, 3, 5, 4, 6, 5], dtype=int32)
+    batch.n_node
+    >> DeviceArray([3, 5], dtype=int32)
+    batch.n_edge
+    >> DeviceArray([5, 10], dtype=int32)
+
+  If a ``GraphsTuple`` does not contain any graphs, it will be dropped from the
   batch.
 
   This method is not compilable because it is data dependent.
 
-  This functionality was implementation as  `utils_tf.concat` in the Tensorflow
-  version of graph_nets.
+  This functionality was implementation as  ``utils_tf.concat`` in the
+  Tensorflow version of graph_nets.
 
   Args:
-    graphs: sequence of `GraphsTuple` which will be batched into a single graph.
+    graphs: sequence of ``GraphsTuple``s which will be batched into a single
+      graph.
   """
   return _batch(graphs, np_=jnp)
 
@@ -179,9 +179,9 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
                     n_node: int,
                     n_edge: int,
                     n_graph: int = 2) -> gn_graph.GraphsTuple:
-  """Pads a `GraphsTuple` to given size by adding computation preserving graphs.
+  """Pads a ``GraphsTuple`` to size by adding computation preserving graphs.
 
-  The `GraphsTuple` is padded by first adding a dummy graph which contains the
+  The ``GraphsTuple`` is padded by first adding a dummy graph which contains the
   padding nodes and edges, and then empty graphs without nodes or edges.
 
   The empty graphs and the dummy graph do not interfer with the graphnet
@@ -193,20 +193,21 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
   is data-dependent.
 
   Args:
-    graph: `GraphsTuple` padded with dummy graph and empty graphs.
-    n_node: the number of nodes in the padded `GraphsTuple`.
-    n_edge: the number of edges in the padded `GraphsTuple`.
-    n_graph: the number of graphs in the padded `GraphsTuple`. Default is 2,
+    graph: ``GraphsTuple`` padded with dummy graph and empty graphs.
+    n_node: the number of nodes in the padded ``GraphsTuple``.
+    n_edge: the number of edges in the padded ``GraphsTuple``.
+    n_graph: the number of graphs in the padded ``GraphsTuple``. Default is 2,
       which is the lowest possible value, because we always have at least one
-      graph in the original `GraphsTuple` and we need one dummy graph for the
+      graph in the original ``GraphsTuple`` and we need one dummy graph for the
       padding.
 
   Raises:
-    ValueError: if the passed `n_graph` is smaller than 2.
-    RuntimeError: if the given `GraphsTuple` is too large for the given padding.
+    ValueError: if the passed ``n_graph`` is smaller than 2.
+    RuntimeError: if the given ``GraphsTuple`` is too large for the given
+      padding.
 
   Returns:
-    A padded `GraphsTuple`.
+    A padded ``GraphsTuple``.
   """
   if n_graph < 2:
     raise ValueError(
@@ -248,10 +249,11 @@ def get_number_of_padding_with_graphs_graphs(
   """Returns number of padding graphs in padded_graph.
 
   Warning: This method only gives results for graphs that have been padded with
-  `pad_with_graphs`.
+  ``pad_with_graphs``.
 
   Args:
-    padded_graph: a `GraphsTuple` that has been padded with `pad_with_graphs`.
+    padded_graph: a ``GraphsTuple`` that has been padded with
+      ``pad_with_graphs``.
 
   Returns:
     The number of padding graphs.
@@ -268,10 +270,11 @@ def get_number_of_padding_with_graphs_nodes(
   """Returns number of padding nodes in given padded_graph.
 
   Warning: This method only gives results for graphs that have been padded with
-  `pad_with_graphs`.
+  ``pad_with_graphs``.
 
   Args:
-    padded_graph: a `GraphsTuple` that has been padded with `pad_with_graphs`.
+    padded_graph: a ``GraphsTuple`` that has been padded with
+      ``pad_with_graphs``.
 
   Returns:
     The number of padding nodes.
@@ -285,10 +288,11 @@ def get_number_of_padding_with_graphs_edges(
   """Returns number of padding edges in given padded_graph.
 
   Warning: This method only gives results for graphs that have been padded with
-  `pad_with_graphs`.
+  ``pad_with_graphs``.
 
   Args:
-    padded_graph: a `GraphsTuple` that has been padded with `pad_with_graphs`.
+    padded_graph: a ``GraphsTuple`` that has been padded with
+      ``pad_with_graphs``.
 
   Returns:
     The number of padding edges.
@@ -302,13 +306,13 @@ def unpad_with_graphs(
   """Unpads the given graph by removing the dummy graph and empty graphs.
 
   This function assumes that the given graph was padded with the
-  `pad_with_graphs` function.
+  ``pad_with_graphs`` function.
 
   This function does not support jax.jit, because the shape of the output
   is data-dependent!
 
   Args:
-    padded_graph: `GraphsTuple` padded with a dummy graph
+    padded_graph: ``GraphsTuple`` padded with a dummy graph
       and empty graphs.
 
   Returns:
@@ -335,7 +339,7 @@ def get_node_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the nodes of a padded graph.
 
   Args:
-    padded_graph: `GraphsTuple` padded using `pad_with_graphs`. This
+    padded_graph: ``GraphsTuple`` padded using ``pad_with_graphs``. This
         graph must contain at least one array of node features so the total
         static number of nodes can be inferred statically from the shape, and
         the method can be jitted.
@@ -358,7 +362,7 @@ def get_edge_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the edges of a padded graph.
 
   Args:
-    padded_graph: `GraphsTuple` padded using `pad_with_graphs`.
+    padded_graph: ``GraphsTuple`` padded using ``pad_with_graphs``.
 
   Returns:
     Boolean array of shape [total_num_edges] containing True for real edges,
@@ -373,7 +377,7 @@ def get_graph_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the graphs of a padded graph.
 
   Args:
-    padded_graph: `GraphsTuple` padded using `pad_with_graphs`.
+    padded_graph: ``GraphsTuple`` padded using ``pad_with_graphs``.
 
   Returns:
     Boolean array of shape [total_num_graphs] containing True for real graphs,
@@ -400,21 +404,19 @@ def concatenated_args(
   passing them to a neural network. This wrapper concatenates the arguments
   for you.
 
-  For example:
+  For example::
 
-  ```
-  # Without the wrapper
-  def update_node_fn(nodes, receivers, globals):
-    return net(jnp.concatenate([nodes, receivers, globals], axis=1))
+    # Without the wrapper
+    def update_node_fn(nodes, receivers, globals):
+      return net(jnp.concatenate([nodes, receivers, globals], axis=1))
 
-  # With the wrapper
-  @concatenated_args
-  def update_node_fn(features):
-    return net(features)
-  ```
+    # With the wrapper
+    @concatenated_args
+    def update_node_fn(features):
+      return net(features)
 
   Args:
-    update: an update function that takes `jnp.ndarray`.
+    update: an update function that takes ``jnp.ndarray``.
     axis: the axis upon which to concatenate.
 
   Returns:
@@ -463,13 +465,13 @@ def segment_max(data, segment_ids, num_segments=None,
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
       jnp.max(-segment_ids))`` but since `num_segments` determines the size of
-      the output, a static value must be provided to use `segment_sum` in a
-      `jit`-compiled function.
-    indices_are_sorted: whether `segment_ids` is known to be sorted
-    unique_indices: whether `segment_ids` is known to be free of duplicates
+      the output, a static value must be provided to use ``segment_max`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
 
   Returns:
-    An array with shape :code:`(num_segments,) + data.shape[1:]` representing
+    An array with shape ``(num_segments,) + data.shape[1:]`` representing
     the segment maxs.
   """
   if num_segments is None:
@@ -492,13 +494,11 @@ def segment_softmax(logits: jnp.ndarray, segment_ids: jnp.ndarray,
   For a given tree of logits that can be divded into segments, computes a
   softmax over the segments.
 
-  ```
-  logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
-  segment_ids = jnp.ndarray([0, 0, 0, 1, 1])
-  segment_softmax(logits, segments)
-  >> DeviceArray([0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
-  >> dtype=float32)
-  ```
+    logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
+    segment_ids = jnp.ndarray([0, 0, 0, 1, 1])
+    segment_softmax(logits, segments)
+    >> DeviceArray([0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
+    >> dtype=float32)
 
   Args:
     logits: an array of logits to be segment softmaxed.
@@ -508,14 +508,14 @@ def segment_softmax(logits: jnp.ndarray, segment_ids: jnp.ndarray,
       wrapped into that range by applying jnp.mod.
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
-      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
-      the output, a static value must be provided to use `segment_sum` in a
-      `jit`-compiled function.
-    indices_are_sorted: whether `segment_ids` is known to be sorted
-    unique_indices: whether `segment_ids` is known to be free of duplicates
+      jnp.max(-segment_ids))`` but since ``num_segments`` determines the size of
+      the output, a static value must be provided to use ``segment_sum`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
 
   Returns:
-    The segment softmax-ed `logits`.
+    The segment softmax-ed ``logits``.
   """
   # First, subtract the segment max for numerical stability
   maxs = segment_max(logits, segment_ids, num_segments, indices_are_sorted,
@@ -534,21 +534,21 @@ def partition_softmax(logits: ArrayTree, partitions: jnp.ndarray,
                       sum_partitions: Optional[int] = None):
   """Compute a softmax within partitions of an array.
 
-  ```
-  logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
-  partitions = jnp.ndarray([3, 2])
-  partition_softmax(node_logits, n_node)
-  >> DeviceArray([0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
-  >> dtype=float32)
-  ```
+    For example::
+      logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
+      partitions = jnp.ndarray([3, 2])
+      partition_softmax(node_logits, n_node)
+      >> DeviceArray(
+      >> [0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
+      >> dtype=float32)
 
   Args:
     logits: the logits for the softmax.
     partitions: the number of nodes per graph. It is a vector of integers with
-      shape `[n_graphs]`, such that `graph.n_node[i]` is the number of nodes in
-      the i-th graph.
+      shape ``[n_graphs]``, such that ``graph.n_node[i]`` is the number of nodes
+      in the i-th graph.
     sum_partitions: the sum of n_node. If not passed, the result of this method
-      is data dependent and so not jit-able.
+      is data dependent and so not ``jit``-able.
 
   Returns:
     The softmax over nodes by graph.
