@@ -140,13 +140,20 @@ def unbatch(graph: gn_graph.GraphsTuple) -> List[gn_graph.GraphsTuple]:
   Args:
     graph: the batched graph, which will be unbatched into a list of graphs.
   """
+  return _unbatch(graph, np_=jnp)
+
+
+def _unbatch(
+    graph: gn_graph.GraphsTuple, np_) -> List[gn_graph.GraphsTuple]:
+  """Returns a list of graphs given a batched graph."""
+
   def _map_split(nest, indices_or_sections):
     """Splits leaf nodes of nests and returns a list of nests."""
     if isinstance(indices_or_sections, int):
       n_lists = indices_or_sections
     else:
       n_lists = len(indices_or_sections) + 1
-    concat = lambda field: jnp.split(field, indices_or_sections)
+    concat = lambda field: np_.split(field, indices_or_sections)
     nest_of_lists = tree.tree_map(concat, nest)
     # pylint: disable=cell-var-from-loop
     list_of_nests = [tree.tree_multimap(lambda _, x: x[i], nest, nest_of_lists)
@@ -155,18 +162,18 @@ def unbatch(graph: gn_graph.GraphsTuple) -> List[gn_graph.GraphsTuple]:
 
   all_n_node = graph.n_node[:, None]
   all_n_edge = graph.n_edge[:, None]
-  node_offsets = jnp.cumsum(graph.n_node[:-1])
+  node_offsets = np_.cumsum(graph.n_node[:-1])
   all_nodes = _map_split(graph.nodes, node_offsets)
-  edge_offsets = jnp.cumsum(graph.n_edge[:-1])
+  edge_offsets = np_.cumsum(graph.n_edge[:-1])
   all_edges = _map_split(graph.edges, edge_offsets)
   all_globals = _map_split(graph.globals, len(graph.n_node))
-  all_senders = jnp.split(graph.senders, edge_offsets)
-  all_receivers = jnp.split(graph.receivers, edge_offsets)
+  all_senders = np_.split(graph.senders, edge_offsets)
+  all_receivers = np_.split(graph.receivers, edge_offsets)
 
   # Corrects offset in the sender and receiver arrays, caused by splitting the
   # nodes array.
   n_graphs = graph.n_node.shape[0]
-  for graph_index in jnp.arange(n_graphs)[1:]:
+  for graph_index in np_.arange(n_graphs)[1:]:
     all_senders[graph_index] -= node_offsets[graph_index - 1]
     all_receivers[graph_index] -= node_offsets[graph_index - 1]
 

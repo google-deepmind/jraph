@@ -68,112 +68,114 @@ def _get_random_graph(max_n_graph=10,
       receivers=jnp.asarray(receivers))
 
 
+def _make_nest(array):
+  """Returns a nest given an array."""
+  return {'a': array,
+          'b': [jnp.ones_like(array), {'c': jnp.zeros_like(array)}]}
+
+
+def _get_list_and_batched_graph():
+  """Returns a list of individual graphs and a batched version.
+
+  This test-case includes the following corner-cases:
+    - single node,
+    - multiple nodes,
+    - no edges,
+    - single edge,
+    - and multiple edges.
+  """
+  batched_graph = graph.GraphsTuple(
+      n_node=jnp.array([1, 3, 1, 0, 2, 0, 0]),
+      n_edge=jnp.array([2, 5, 0, 0, 1, 0, 0]),
+      nodes=_make_nest(jnp.arange(14).reshape(7, 2)),
+      edges=_make_nest(jnp.arange(24).reshape(8, 3)),
+      globals=_make_nest(jnp.arange(14).reshape(7, 2)),
+      senders=jnp.array([0, 0, 1, 1, 2, 3, 3, 6]),
+      receivers=jnp.array([0, 0, 2, 1, 3, 2, 1, 5]))
+
+  list_graphs = [
+      graph.GraphsTuple(
+          n_node=jnp.array([1]),
+          n_edge=jnp.array([2]),
+          nodes=_make_nest(jnp.array([[0, 1]])),
+          edges=_make_nest(jnp.array([[0, 1, 2], [3, 4, 5]])),
+          globals=_make_nest(jnp.array([[0, 1]])),
+          senders=jnp.array([0, 0]),
+          receivers=jnp.array([0, 0])),
+      graph.GraphsTuple(
+          n_node=jnp.array([3]),
+          n_edge=jnp.array([5]),
+          nodes=_make_nest(jnp.array([[2, 3], [4, 5], [6, 7]])),
+          edges=_make_nest(
+              jnp.array([[6, 7, 8], [9, 10, 11], [12, 13, 14], [15, 16, 17],
+                         [18, 19, 20]])),
+          globals=_make_nest(jnp.array([[2, 3]])),
+          senders=jnp.array([0, 0, 1, 2, 2]),
+          receivers=jnp.array([1, 0, 2, 1, 0])),
+      graph.GraphsTuple(
+          n_node=jnp.array([1]),
+          n_edge=jnp.array([0]),
+          nodes=_make_nest(jnp.array([[8, 9]])),
+          edges=_make_nest(jnp.zeros((0, 3))),
+          globals=_make_nest(jnp.array([[4, 5]])),
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([0]),
+          n_edge=jnp.array([0]),
+          nodes=_make_nest(jnp.zeros((0, 2))),
+          edges=_make_nest(jnp.zeros((0, 3))),
+          globals=_make_nest(jnp.array([[6, 7]])),
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([2]),
+          n_edge=jnp.array([1]),
+          nodes=_make_nest(jnp.array([[10, 11], [12, 13]])),
+          edges=_make_nest(jnp.array([[21, 22, 23]])),
+          globals=_make_nest(jnp.array([[8, 9]])),
+          senders=jnp.array([1]),
+          receivers=jnp.array([0])),
+      graph.GraphsTuple(
+          n_node=jnp.array([0]),
+          n_edge=jnp.array([0]),
+          nodes=_make_nest(jnp.zeros((0, 2))),
+          edges=_make_nest(jnp.zeros((0, 3))),
+          globals=_make_nest(jnp.array([[10, 11]])),
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([0]),
+          n_edge=jnp.array([0]),
+          nodes=_make_nest(jnp.zeros((0, 2))),
+          edges=_make_nest(jnp.zeros((0, 3))),
+          globals=_make_nest(jnp.array([[12, 13]])),
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([]),
+          n_edge=jnp.array([]),
+          nodes=_make_nest(jnp.zeros((0, 2))),
+          edges=_make_nest(jnp.zeros((0, 3))),
+          globals=_make_nest(jnp.zeros((0, 2))),
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+  ]
+
+  return list_graphs, batched_graph
+
+
 class GraphTest(test_util.JaxTestCase):
-
-  def _make_nest(self, array):
-    """Returns a nest given an array."""
-    return {'a': array,
-            'b': [jnp.ones_like(array), {'c': jnp.zeros_like(array)}]}
-
-  def _get_list_and_batched_graph(self):
-    """Returns a list of individual graphs and a batched version.
-
-    This test-case includes the following corner-cases:
-      - single node,
-      - multiple nodes,
-      - no edges,
-      - single edge,
-      - and multiple edges.
-    """
-    batched_graph = graph.GraphsTuple(
-        n_node=jnp.array([1, 3, 1, 0, 2, 0, 0]),
-        n_edge=jnp.array([2, 5, 0, 0, 1, 0, 0]),
-        nodes=self._make_nest(jnp.arange(14).reshape(7, 2)),
-        edges=self._make_nest(jnp.arange(24).reshape(8, 3)),
-        globals=self._make_nest(jnp.arange(14).reshape(7, 2)),
-        senders=jnp.array([0, 0, 1, 1, 2, 3, 3, 6]),
-        receivers=jnp.array([0, 0, 2, 1, 3, 2, 1, 5]))
-
-    list_graphs = [
-        graph.GraphsTuple(
-            n_node=jnp.array([1]),
-            n_edge=jnp.array([2]),
-            nodes=self._make_nest(jnp.array([[0, 1]])),
-            edges=self._make_nest(jnp.array([[0, 1, 2], [3, 4, 5]])),
-            globals=self._make_nest(jnp.array([[0, 1]])),
-            senders=jnp.array([0, 0]),
-            receivers=jnp.array([0, 0])),
-        graph.GraphsTuple(
-            n_node=jnp.array([3]),
-            n_edge=jnp.array([5]),
-            nodes=self._make_nest(jnp.array([[2, 3], [4, 5], [6, 7]])),
-            edges=self._make_nest(
-                jnp.array([[6, 7, 8], [9, 10, 11], [12, 13, 14], [15, 16, 17],
-                           [18, 19, 20]])),
-            globals=self._make_nest(jnp.array([[2, 3]])),
-            senders=jnp.array([0, 0, 1, 2, 2]),
-            receivers=jnp.array([1, 0, 2, 1, 0])),
-        graph.GraphsTuple(
-            n_node=jnp.array([1]),
-            n_edge=jnp.array([0]),
-            nodes=self._make_nest(jnp.array([[8, 9]])),
-            edges=self._make_nest(jnp.zeros((0, 3))),
-            globals=self._make_nest(jnp.array([[4, 5]])),
-            senders=jnp.array([]),
-            receivers=jnp.array([])),
-        graph.GraphsTuple(
-            n_node=jnp.array([0]),
-            n_edge=jnp.array([0]),
-            nodes=self._make_nest(jnp.zeros((0, 2))),
-            edges=self._make_nest(jnp.zeros((0, 3))),
-            globals=self._make_nest(jnp.array([[6, 7]])),
-            senders=jnp.array([]),
-            receivers=jnp.array([])),
-        graph.GraphsTuple(
-            n_node=jnp.array([2]),
-            n_edge=jnp.array([1]),
-            nodes=self._make_nest(jnp.array([[10, 11], [12, 13]])),
-            edges=self._make_nest(jnp.array([[21, 22, 23]])),
-            globals=self._make_nest(jnp.array([[8, 9]])),
-            senders=jnp.array([1]),
-            receivers=jnp.array([0])),
-        graph.GraphsTuple(
-            n_node=jnp.array([0]),
-            n_edge=jnp.array([0]),
-            nodes=self._make_nest(jnp.zeros((0, 2))),
-            edges=self._make_nest(jnp.zeros((0, 3))),
-            globals=self._make_nest(jnp.array([[10, 11]])),
-            senders=jnp.array([]),
-            receivers=jnp.array([])),
-        graph.GraphsTuple(
-            n_node=jnp.array([0]),
-            n_edge=jnp.array([0]),
-            nodes=self._make_nest(jnp.zeros((0, 2))),
-            edges=self._make_nest(jnp.zeros((0, 3))),
-            globals=self._make_nest(jnp.array([[12, 13]])),
-            senders=jnp.array([]),
-            receivers=jnp.array([])),
-        graph.GraphsTuple(
-            n_node=jnp.array([]),
-            n_edge=jnp.array([]),
-            nodes=self._make_nest(jnp.zeros((0, 2))),
-            edges=self._make_nest(jnp.zeros((0, 3))),
-            globals=self._make_nest(jnp.zeros((0, 2))),
-            senders=jnp.array([]),
-            receivers=jnp.array([])),
-    ]
-
-    return list_graphs, batched_graph
 
   def test_batch(self):
     """Tests batching of graph."""
-    list_graphs_tuple, batched_graphs_tuple = self._get_list_and_batched_graph()
+    list_graphs_tuple, batched_graphs_tuple = _get_list_and_batched_graph()
     graphs_tuple = utils.batch(list_graphs_tuple)
     self.assertAllClose(graphs_tuple, batched_graphs_tuple, check_dtypes=False)
 
   def test_unbatch(self):
     """Tests unbatching of graph."""
-    list_graphs_tuple, batched_graphs_tuple = self._get_list_and_batched_graph()
+    list_graphs_tuple, batched_graphs_tuple = _get_list_and_batched_graph()
     graphs_tuples = utils.unbatch(batched_graphs_tuple)
     # The final GraphsTuple does not contain a graph, and so shouldn't be
     # present in the result.
@@ -205,7 +207,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_pad_with_graphs(self):
     """Tests padding of graph."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     padded_graphs_tuple = utils.pad_with_graphs(graphs_tuple, 10, 12, 9)
     expected_padded_graph = graph.GraphsTuple(
         n_node=jnp.concatenate([graphs_tuple.n_node,
@@ -232,14 +234,14 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_unpad(self):
     """Tests unpadding of graph."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     unpadded_graphs_tuple = utils.unpad_with_graphs(graphs_tuple)
     expected_unpadded_graph = graph.GraphsTuple(
         n_node=jnp.array([1, 3, 1, 0]),
         n_edge=jnp.array([2, 5, 0, 0]),
-        nodes=self._make_nest(jnp.arange(10).reshape(5, 2)),
-        edges=self._make_nest(jnp.arange(21).reshape(7, 3)),
-        globals=self._make_nest(jnp.arange(8).reshape(4, 2)),
+        nodes=_make_nest(jnp.arange(10).reshape(5, 2)),
+        edges=_make_nest(jnp.arange(21).reshape(7, 3)),
+        globals=_make_nest(jnp.arange(8).reshape(4, 2)),
         senders=jnp.array([0, 0, 1, 1, 2, 3, 3]),
         receivers=jnp.array([0, 0, 2, 1, 3, 2, 1]))
     self.assertAllClose(
@@ -264,7 +266,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_number_of_padding_with_graphs_graphs(self):
     """Tests the number of padding graphs calculation."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected = 3
     with self.subTest('nojit'):
       self.assertAllClose(
@@ -279,7 +281,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_number_of_padding_with_graphs_nodes(self):
     """Tests the number of padding nodes calculation."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected = 2
     with self.subTest('nojit'):
       self.assertAllClose(
@@ -294,7 +296,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_number_of_padding_with_graphs_edges(self):
     """Tests the number of padding edges calculation."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected = 1
     with self.subTest('nojit'):
       self.assertAllClose(
@@ -309,7 +311,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_node_padding_mask(self):
     """Tests construction of node padding mask."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected_mask = jnp.array([1, 1, 1, 1, 1, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_node_padding_mask(graphs_tuple)
@@ -320,7 +322,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_edge_padding_mask(self):
     """Tests construction of edge padding mask."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_edge_padding_mask(graphs_tuple)
@@ -331,7 +333,7 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_get_graph_padding_mask(self):
     """Tests construction of graph padding mask."""
-    _, graphs_tuple = self._get_list_and_batched_graph()
+    _, graphs_tuple = _get_list_and_batched_graph()
     expected_mask = jnp.array([1, 1, 1, 1, 0, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_graph_padding_mask(graphs_tuple)
