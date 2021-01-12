@@ -15,14 +15,17 @@
 """Utilities for working with `GraphsTuple`s."""
 
 import functools
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, \
+  Union
 
 import jax
 import jax.numpy as jnp
+import jax.ops
 import jax.tree_util as tree
-from jraph._src import graph as gn_graph
 import numpy as np
+from jax import lax
 
+from jraph._src import graph as gn_graph
 
 # As of 04/2020 pytype doesn't support recursive types.
 # pytype: disable=not-supported-yet
@@ -39,18 +42,55 @@ segment_sum = jax.ops.segment_sum
 sorted_segment_sum = functools.partial(segment_sum, indices_are_sorted=True)
 
 
-def segment_mean(values, segment_indices, n_segments):
+def segment_mean(data, segment_ids, num_segments):
   """Returns mean for each segment.
 
   Args:
-    values: the values which are averaged segment-wise.
-    segment_indices: indices for the segments.
-    n_segments: total number of segments.
+    data: the values which are averaged segment-wise.
+    segment_ids: indices for the segments.
+    num_segments: total number of segments.
   """
-  nominator = jax.ops.segment_sum(values, segment_indices, n_segments)
+  nominator = jax.ops.segment_sum(data, segment_ids, num_segments)
   denominator = jax.ops.segment_sum(
-      jnp.ones_like(values), segment_indices, n_segments)
+    jnp.ones_like(data), segment_ids, num_segments)
   return jnp.nan_to_num(nominator / denominator)
+
+
+def segment_variance(data, segment_ids, num_segments):
+  """Returns the variance for each segment.
+
+  Args:
+    data: values whose variance will be calculated segment-wise.
+    segment_ids: indices for segments
+    num_segments: total number of segments. Required to
+
+  Returns:
+    num_segments size array containing the variance of each segment.
+  """
+  means = segment_mean(data, segment_ids, num_segments)[segment_ids]
+  counts = jax.ops.segment_sum(jnp.ones_like(data), segment_ids, num_segments)
+  variances = jax.ops.segment_sum(jnp.power(data - means, 2),
+                                  segment_ids, num_segments) / counts
+  return jnp.nan_to_num(variances)
+
+
+def segment_normalize(data, segment_ids, num_segments, eps=1e-5):
+  """Normalizes data within each segment.
+
+  Args:
+    data: values whose z-score normalized values will be calculated.
+      segment-wise.
+    segment_ids: indices for segments.
+    num_segments: total number of segments.
+    eps: epsilon for numerical stability.
+
+  Returns:
+    array containing data normalized segment-wise.
+  """
+  means = segment_mean(data, segment_ids, num_segments)[segment_ids]
+  variances = segment_variance(data, segment_ids, num_segments)[segment_ids]
+  normalized = (data - means) * lax.rsqrt(variances + eps)
+  return jnp.nan_to_num(normalized)
 
 
 def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:

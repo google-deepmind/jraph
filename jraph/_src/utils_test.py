@@ -342,15 +342,30 @@ class GraphTest(test_util.JaxTestCase):
 
   def test_segment_sum(self):
     result = utils.segment_sum(
-        jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
+      jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
     self.assertAllClose(result, jnp.array([16, 14, 2, 0, 4, 0]),
                         check_dtypes=False)
 
   def test_segment_mean(self):
     result = utils.segment_mean(
-        jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
-    self.assertAllClose(result, jnp.array([4, 14/3.0, 2, 0, 4, 0]),
+      jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
+    self.assertAllClose(result, jnp.array([4, 14 / 3.0, 2, 0, 4, 0]),
                         check_dtypes=False)
+
+  def test_segment_variance(self):
+    result = utils.segment_variance(
+      jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
+    self.assertAllClose(result, jnp.stack([jnp.var(jnp.arange(3)),
+                                           jnp.var(jnp.arange(3, 5)),
+                                           jnp.var(jnp.arange(5, 8))]))
+
+  def test_segment_normalize(self):
+    result = utils.segment_normalize(
+      jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
+    self.assertAllClose(result,
+                        jnp.concatenate([jax.nn.normalize(jnp.arange(3)),
+                                         jax.nn.normalize(jnp.arange(3, 5)),
+                                         jax.nn.normalize(jnp.arange(5, 8))]))
 
   @parameterized.parameters((False, False),
                             (True, False),
