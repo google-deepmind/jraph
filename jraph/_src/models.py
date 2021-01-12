@@ -52,17 +52,22 @@ AggregateEdgesToGlobalsFn = Callable[[EdgeFeatures, jnp.ndarray, int],
 # (edge features, sender node features, receiver node features, globals) ->
 # attention weights
 AttentionLogitFn = Callable[
-    [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], ArrayTree]
+  [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], ArrayTree]
 
 # Signature:
 # (edge features, weights) -> edge features for node update
 AttentionReduceFn = Callable[[EdgeFeatures, ArrayTree], EdgeFeatures]
 
 # Signature:
+# (edges to be normalized, segment ids, number of segments) ->
+# normalized edges
+AttentionNormalizeFn = Callable[[EdgeFeatures, jnp.ndarray, int], Globals]
+
+# Signature:
 # (edge features, sender node features, receiver node features, globals) ->
 # updated edge features
 GNUpdateEdgeFn = Callable[
-    [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], EdgeFeatures]
+  [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], EdgeFeatures]
 
 # Signature:
 # (node features, outgoing edge features, incoming edge features,
@@ -78,11 +83,10 @@ def GraphNetwork(
     update_node_fn: Optional[GNUpdateNodeFn],
     update_global_fn: Optional[GNUpdateGlobalFn] = None,
     aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
-    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = jax.ops
-    .segment_sum,
-    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = jax.ops
-    .segment_sum,
+    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = jax.ops.segment_sum,
+    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = jax.ops.segment_sum,
     attention_logit_fn: Optional[AttentionLogitFn] = None,
+    attention_normalize_fn: Optional[AttentionNormalizeFn] = utils.segment_softmax,
     attention_reduce_fn: Optional[AttentionReduceFn] = None):
   """Returns a method that applies a configured GraphNetwork.
 
@@ -111,6 +115,8 @@ def GraphNetwork(
       globals.
     attention_logit_fn: function used to calculate the attention weights or
       None to deactivate attention mechanism.
+    attention_normalize_fn: function used to normalize raw attention logits or
+      None if attention mechanism is not active.
     attention_reduce_fn: function used to apply weights to the edge features or
       None if attention mechanism is not active.
 
@@ -170,7 +176,7 @@ def GraphNetwork(
     if attention_logit_fn:
       logits = attention_logit_fn(edges, sent_attributes, received_attributes,
                                   global_edge_attributes)
-      tree_calculate_weights = functools.partial(utils.segment_softmax,
+      tree_calculate_weights = functools.partial(attention_normalize_fn,
                                                  segment_ids=receivers,
                                                  num_segments=sum_n_node)
       weights = tree.tree_map(tree_calculate_weights, logits)
