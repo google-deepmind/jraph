@@ -20,7 +20,6 @@ from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, \
 
 import jax
 import jax.numpy as jnp
-import jax.ops
 import jax.tree_util as tree
 from jax import lax
 from jraph._src import graph as gn_graph
