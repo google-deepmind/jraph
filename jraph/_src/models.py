@@ -52,7 +52,7 @@ AggregateEdgesToGlobalsFn = Callable[[EdgeFeatures, jnp.ndarray, int],
 # (edge features, sender node features, receiver node features, globals) ->
 # attention weights
 AttentionLogitFn = Callable[
-  [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], ArrayTree]
+    [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], ArrayTree]
 
 # Signature:
 # (edge features, weights) -> edge features for node update
@@ -61,13 +61,13 @@ AttentionReduceFn = Callable[[EdgeFeatures, ArrayTree], EdgeFeatures]
 # Signature:
 # (edges to be normalized, segment ids, number of segments) ->
 # normalized edges
-AttentionNormalizeFn = Callable[[EdgeFeatures, jnp.ndarray, int], Globals]
+AttentionNormalizeFn = Callable[[EdgeFeatures, jnp.ndarray, int], EdgeFeatures]
 
 # Signature:
 # (edge features, sender node features, receiver node features, globals) ->
 # updated edge features
 GNUpdateEdgeFn = Callable[
-  [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], EdgeFeatures]
+    [EdgeFeatures, SenderFeatures, ReceiverFeatures, Globals], EdgeFeatures]
 
 # Signature:
 # (node features, outgoing edge features, incoming edge features,
