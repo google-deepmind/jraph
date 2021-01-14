@@ -2,7 +2,7 @@
 ![logo](images/logo.png)
 # Jraph - A library for graph neural networks in jax.
 
-[**Quick Start**](#quick-start)|[**Documentation**](https://jraph.readthedocs.io/en/latest/)
+[**Quick Start** ](#quick-start)|[ **Documentation** ](https://jraph.readthedocs.io/en/latest/)
 
 Jraph (pronounced "giraffe") is a lightweight library for working with graph
 neural networks in jax. It provides a data structure for graphs, a set of
@@ -38,7 +38,7 @@ doesn't prescribe a way to write or develop graph neural networks.
 Jraph takes inspiration from the Tensorflow [graph_nets library](https://github.com/deepmind/graph_nets) in defining a `GraphsTuple`
 data structure, which is a namedtuple that contains one or more directed graphs.
 
-### Representing Graphs - The `GraphsTuple`.
+### Representing Graphs - The `GraphsTuple`
 
 ```
 import jraph
@@ -106,7 +106,7 @@ node_targets = jnp.array([[True], [False], [True]])
 graph = graph._replace(nodes={'inputs': graph.nodes, 'targets': node_targets})
 ```
 
-### Using the Model Zoo.
+### Using the Model Zoo
 
 Jraph provides a set of implemented reference models for you to use.
 
