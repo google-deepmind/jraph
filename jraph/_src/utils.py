@@ -604,3 +604,61 @@ def partition_softmax(logits: ArrayTree, partitions: jnp.ndarray,
                            total_repeat_length=sum_partitions)
   return segment_softmax(logits, segment_ids, n_partitions,
                          indices_are_sorted=True)
+
+
+def get_fully_connected_graph(n_node_per_graph: int,
+                              n_graph: int,
+                              node_features: Optional[ArrayTree] = None,
+                              global_features: Optional[ArrayTree] = None,
+                              add_self_edges: bool = True):
+  """Gets a fully connected graph given n_node_per_graph and n_graph.
+
+  This method is jittable.
+
+  Args:
+    n_node_per_graph: The number of nodes in each graph.
+    n_graph: The number of graphs in the `jraph.GraphsTuple`.
+    node_features: Optional node features.
+    global_features: Optional global features.
+    add_self_edges: Whether to add self edges to the graph.
+
+  Returns:
+    `jraph.GraphsTuple`
+  """
+  if node_features is not None:
+    num_node_features = jax.tree_leaves(node_features)[0].shape[0]
+    if n_node_per_graph * n_graph != num_node_features:
+      raise ValueError(
+          'Number of nodes is not equal to num_nodes_per_graph * n_graph.')
+  if global_features is not None:
+    if n_graph != jax.tree_leaves(global_features)[0].shape[0]:
+      raise ValueError('The number of globals is not equal to n_graph.')
+  senders = []
+  receivers = []
+  n_edge = []
+  tmp_senders, tmp_receivers = jnp.meshgrid(
+      jnp.arange(n_node_per_graph), jnp.arange(n_node_per_graph))
+  if not add_self_edges:
+    tmp_senders = jax.vmap(jnp.roll)(
+        tmp_senders, jnp.arange(len(tmp_senders)))[:, 1:]
+    tmp_receivers = tmp_receivers[:, 1:]
+  # Flatten the senders and receivers.
+  tmp_senders = tmp_senders.flatten()
+  tmp_receivers = tmp_receivers.flatten()
+  for graph_idx in range(n_graph):
+    offset = graph_idx * n_node_per_graph
+    senders.append(tmp_senders + offset)
+    receivers.append(tmp_receivers + offset)
+    n_edge.append(len(tmp_senders))
+  return gn_graph.GraphsTuple(
+      nodes=node_features,
+      edges=None,
+      n_node=jnp.array([n_node_per_graph]*n_graph),
+      n_edge=jnp.array(n_edge) if n_edge else jnp.array([0]),
+      senders=jnp.concatenate(senders) if senders else senders,
+      receivers=jnp.concatenate(receivers) if receivers else receivers,
+      globals=global_features
+  )
+
+
+

@@ -487,6 +487,37 @@ class GraphTest(test_util.JaxTestCase):
           data, partitions, sum_partitions)
       self.assertAllClose(result, expected_out, check_dtypes=True)
 
+  @parameterized.named_parameters(('valid_1_no_feat', 1, 1, False, False),
+                                  ('valid_5_no_feat', 5, 5, False, False),
+                                  ('valid_1_nodes', 1, 1, True, False),
+                                  ('valid_5_globals', 5, 5, False, True),
+                                  ('valid_5_both', 5, 5, True, True),
+                                  ('zero_nodes', 0, 1, False, False),
+                                  ('zero_graphs', 1, 0, False, False),)
+  def test_fully_connected_graph(self, n_node, n_graph, nodes, globals_):
+    node_feat = np.random.rand(n_node*n_graph, 32) if nodes else None
+    global_feat = np.random.rand(n_graph, 32) if globals_ else None
+    with self.subTest('nojit'):
+      result = utils.get_fully_connected_graph(
+          n_node, n_graph, node_feat, global_feat)
+      if nodes:
+        self.assertLen(result.nodes, n_node*n_graph)
+      if globals_:
+        self.assertLen(result.globals, n_graph)
+      self.assertLen(result.senders, n_node**2 * n_graph)
+      self.assertLen(result.receivers, n_node**2 * n_graph)
+      self.assertAllClose(result.n_node, jnp.array([n_node]*n_graph))
+    with self.subTest('jit'):
+      result = jax.jit(utils.get_fully_connected_graph, static_argnums=[0, 1])(
+          n_node, n_graph, node_feat, global_feat)
+      if nodes:
+        self.assertLen(result.nodes, n_node*n_graph)
+      if globals_:
+        self.assertLen(result.globals, n_graph)
+      self.assertLen(result.senders, n_node**2 * n_graph)
+      self.assertLen(result.receivers, n_node**2 * n_graph)
+      self.assertAllClose(result.n_node, jnp.array([n_node]*n_graph))
+
 
 class ConcatenatedArgsWrapperTest(test_util.JaxTestCase):
 

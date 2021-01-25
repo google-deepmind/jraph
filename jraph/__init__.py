@@ -45,6 +45,7 @@ from jraph._src.utils import ArrayTree
 from jraph._src.utils import batch
 from jraph._src.utils import concatenated_args
 from jraph._src.utils import get_edge_padding_mask
+from jraph._src.utils import get_fully_connected_graph
 from jraph._src.utils import get_graph_padding_mask
 from jraph._src.utils import get_node_padding_mask
 from jraph._src.utils import get_number_of_padding_with_graphs_edges
@@ -75,7 +76,8 @@ __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "get_number_of_padding_with_graphs_edges", "unpad_with_graphs",
            "get_node_padding_mask", "get_edge_padding_mask",
            "get_graph_padding_mask", "segment_max", "segment_softmax",
-           "partition_softmax", "concatenated_args")
+           "partition_softmax", "concatenated_args",
+           "get_fully_connected_graph")
 
 #  _________________________________________
 # / Please don't use symbols in `_src` they \
