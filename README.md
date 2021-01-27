@@ -40,7 +40,7 @@ data structure, which is a namedtuple that contains one or more directed graphs.
 
 ### Representing Graphs - The `GraphsTuple`
 
-```
+```python
 import jraph
 import jax.numpy as jnp
 
@@ -71,15 +71,15 @@ edges=edges, n_node=n_node, n_edge=n_edge, globals=global_context)
 
 A `GraphsTuple` can have more than one graph.
 
-```
+```python
 two_graph_graphstuple = jraph.batch([graph, graph])
 ```
 
 The node and edge features are stacked on the leading axis.
 
-```
+```python
 jraph.batch([graph, graph]).nodes
->> DeviceArray([[0.],
+>>> DeviceArray([[0.],
              [1.],
              [2.],
              [0.],
@@ -89,9 +89,9 @@ jraph.batch([graph, graph]).nodes
 
 You can tell which nodes are from which graph by looking at `n_node`.
 
-```
+```python
 jraph.batch([graph, graph]).n_node
->> DeviceArray([3, 3], dtype=int32)
+>>> DeviceArray([3, 3], dtype=int32)
 ```
 
 You can store nests of features in `nodes`, `edges` and `globals`. This makes
@@ -101,7 +101,7 @@ potentially different types and semantically different meanings (for example
 each nest must have a common leading dimensions size, matching the total number
 of nodes, edges or graphs within the `Graphstuple` respectively.
 
-```
+```python
 node_targets = jnp.array([[True], [False], [True]])
 graph = graph._replace(nodes={'inputs': graph.nodes, 'targets': node_targets})
 ```
@@ -118,7 +118,7 @@ A GraphNet's first update function updates the edges using `edge` features,
 the node features of the `sender` and `receiver` and the `global` features.
 
 
-```
+```python
 # As one example, we just pass the edge features straight through.
 def update_edge_fn(edge, sender, receiver, globals_):
   return edge
@@ -127,7 +127,7 @@ def update_edge_fn(edge, sender, receiver, globals_):
 Often we use the concatenation of these features, and `jraph` provides an easy
 way of doing this with the `concatenated_args` decorator.
 
-```
+```python
 @jraph.concatenated_args
 def update_edge_fn(concatenated_features):
   return concatenated_features
@@ -139,7 +139,7 @@ The user similarly defines functions that update the nodes and globals. These
 are then used to configure a `GraphNetwork`. To see the arguments to the node
 and global `update_fns` please take a look at the model zoo.
 
-```
+```python
 net = jraph.GraphNetwork(update_edge_fn=update_edge_fn,
                          update_node_fn=update_node_fn,
                          update_global_fn=update_global_fn)
@@ -148,7 +148,7 @@ net = jraph.GraphNetwork(update_edge_fn=update_edge_fn,
 `net` is a function that sends messages according to the `GraphNetwork` algorithm
 and applies the `update_fn`. It takes a graph, and returns a graph.
 
-```
+```python
 updated_graph = net(graph)
 ```
 
