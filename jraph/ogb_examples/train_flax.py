@@ -114,7 +114,7 @@ class GraphNetwork(nn.Module):
         update_node_fn=make_mlp(self.mlp_features),
         update_edge_fn=make_mlp(self.mlp_features),
         # The global update outputs size 2 for binary classification.
-        update_global_fn=make_mlp(self.mlp_features + [2]))
+        update_global_fn=make_mlp(self.mlp_features + (2,)))
     return net(embedder(graph))
 
 
@@ -199,7 +199,7 @@ def train(data_path, master_csv_path, split_path, batch_size,
   # Repeat the dataset forever for training.
   reader.repeat()
 
-  net = GraphNetwork(mlp_features=[128, 128], latent_size=128)
+  net = GraphNetwork(mlp_features=(128, 128), latent_size=128)
 
   # Get a candidate graph and label to initialize the network.
   graph, _ = reader.get_graph_by_idx(0)
