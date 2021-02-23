@@ -114,7 +114,7 @@ class GraphNetwork(nn.Module):
         update_node_fn=make_mlp(self.mlp_features),
         update_edge_fn=make_mlp(self.mlp_features),
         # The global update outputs size 2 for binary classification.
-        update_global_fn=make_mlp(self.mlp_features + (2,)))
+        update_global_fn=make_mlp(self.mlp_features + (2,)))  # pytype: disable=unsupported-operands
     return net(embedder(graph))
 
 
