@@ -15,6 +15,10 @@ Jraph can be installed directly from github using the following command:
 
 ```pip install git+git://github.com/deepmind/jraph.git```
 
+The examples require additional dependencies. To install them please run:
+
+```pip install pip install git+git://github.com/deepmind/jraph.git[examples, ogb_examples]```
+
 ## Overview
 
 Jraph is designed to provide utilities for working with graphs in jax, but
@@ -165,6 +169,7 @@ Please note, you need to have downloaded the dataset to run this example.
 The rest of the examples are short scripts demonstrating how to use various
 models from our model zoo, as well as making models go fast with `jax.jit`, and
 how to deal with Jax's static shape requirement.
+
 
 ## Citing Jraph
 
