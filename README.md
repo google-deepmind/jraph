@@ -166,4 +166,16 @@ The rest of the examples are short scripts demonstrating how to use various
 models from our model zoo, as well as making models go fast with `jax.jit`, and
 how to deal with Jax's static shape requirement.
 
+## Citing Jraph
 
+To cite this repository:
+
+```
+@software{jraph2020github,
+  author = {Jonathan Godwin* and Thomas Keck* and Peter Battaglia and Victor Bapst and Thomas Kipf and Yujia Li and Kimberly Stachenfeld and Petar Veličković and Alvaro Sanchez-Gonzalez},
+  title = {{J}raph: {A} library for graph neural networks in jax.},
+  url = {http://github.com/deepmind/jraph},
+  version = {0.0.1.dev},
+  year = {2020},
+}
+```
