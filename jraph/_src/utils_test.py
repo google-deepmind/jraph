@@ -518,6 +518,75 @@ class GraphTest(test_util.JaxTestCase):
       self.assertLen(result.receivers, n_node**2 * n_graph)
       self.assertAllClose(result.n_node, jnp.array([n_node]*n_graph))
 
+    with self.subTest('senders_receiver_indices'):
+      if n_node > 0:
+        # [0, 1, ..., n_node - 1]
+        node_indices = jnp.arange(n_node)
+        # [0, 1,..., n_node - 1] + [0, 1,..., n_node - 1] + ... n_node times
+        # [0,..., 0, 1,..., 1,..., n_node - 1,..., n_node - 1] each n_node times
+        expected_senders = np.concatenate([node_indices] * n_node, axis=0)
+        expected_receivers = np.stack(
+            [node_indices] * n_node, axis=-1).reshape([-1])
+      else:
+        expected_senders = np.array([], dtype=np.int32)
+        expected_receivers = np.array([], dtype=np.int32)
+
+      # Check sender and receivers on each graph in the batch.
+      for result_graph in utils.unbatch(result):
+        self.assertAllClose(result_graph.senders, expected_senders)
+        self.assertAllClose(result_graph.receivers, expected_receivers)
+
+  @parameterized.named_parameters(('valid_1_no_feat', 1, 1),
+                                  ('valid_5_no_feat', 5, 5),
+                                  ('zero_nodes', 0, 1),
+                                  ('zero_graphs', 1, 0),)
+  def test_fully_connected_graph_no_self_edges(self, n_node, n_graph):
+
+    # `test_fully_connected_graph` already tests the case `add_self_edges=True`
+    # so all that is left to test is that if we set `add_self_edges=False` we
+    # get the same edges, except for the self-edges (although order may differ).
+    graph_with_self_edges = utils.get_fully_connected_graph(
+        n_node, n_graph, add_self_edges=True)
+    graph_without_self_edges = utils.get_fully_connected_graph(
+        n_node, n_graph, add_self_edges=False)
+
+    # We will use sets to compare the order, since the order is not preserved
+    # due to the usage of `np.roll` (e.g. if you remove the self edges after
+    # add_self_edges=True, the remaining edges are in a different order than if
+    # add_self_edges=False).
+    send_recv_actual = {
+        (s, r) for s, r in zip(
+            graph_without_self_edges.senders,
+            graph_without_self_edges.receivers)}
+
+    # Remove the self edges by hand from `graph_with_self_edges`
+    mask_self_edges = (
+        graph_with_self_edges.senders == graph_with_self_edges.receivers)
+    send_recv_expected = {
+        (s, r) for s, r in zip(
+            graph_with_self_edges.senders[~mask_self_edges],
+            graph_with_self_edges.receivers[~mask_self_edges])}
+    self.assertSetEqual(send_recv_actual, send_recv_expected)
+
+  @parameterized.named_parameters(('with_self_edges', True),
+                                  ('without_self_edges', False),)
+  def test_fully_connected_graph_order_edges(self, add_self_edges):
+    # This helps documenting the order of the output edges, so we are aware
+    # in case we accidentally change it.
+    graph_batch = utils.get_fully_connected_graph(
+        n_node_per_graph=3,
+        n_graph=1,
+        add_self_edges=add_self_edges)
+
+    if add_self_edges:
+      self.assertSequenceEqual(
+          graph_batch.senders, [0, 1, 2] * 3)
+      self.assertSequenceEqual(
+          graph_batch.receivers, [0] * 3 + [1] * 3 + [2] * 3)
+    else:
+      self.assertSequenceEqual(graph_batch.senders, [1, 2, 2, 0, 0, 1])
+      self.assertSequenceEqual(graph_batch.receivers, [0, 0, 1, 1, 2, 2])
+
 
 class ConcatenatedArgsWrapperTest(test_util.JaxTestCase):
 

@@ -640,7 +640,7 @@ def get_fully_connected_graph(n_node_per_graph: int,
       jnp.arange(n_node_per_graph), jnp.arange(n_node_per_graph))
   if not add_self_edges:
     tmp_senders = jax.vmap(jnp.roll)(
-        tmp_senders, jnp.arange(len(tmp_senders)))[:, 1:]
+        tmp_senders, -jnp.arange(len(tmp_senders)))[:, 1:]
     tmp_receivers = tmp_receivers[:, 1:]
   # Flatten the senders and receivers.
   tmp_senders = tmp_senders.flatten()
@@ -650,15 +650,19 @@ def get_fully_connected_graph(n_node_per_graph: int,
     senders.append(tmp_senders + offset)
     receivers.append(tmp_receivers + offset)
     n_edge.append(len(tmp_senders))
+
+  def _concat_or_empty_indices(indices_list):
+    if indices_list:
+      return jnp.concatenate(indices_list, axis=0)
+    else:
+      return jnp.array([], dtype=tmp_senders.dtype)
   return gn_graph.GraphsTuple(
       nodes=node_features,
       edges=None,
       n_node=jnp.array([n_node_per_graph]*n_graph),
       n_edge=jnp.array(n_edge) if n_edge else jnp.array([0]),
-      senders=jnp.concatenate(senders) if senders else senders,
-      receivers=jnp.concatenate(receivers) if receivers else receivers,
-      globals=global_features
+      senders=_concat_or_empty_indices(senders),
+      receivers=_concat_or_empty_indices(receivers),
+      globals=global_features,
   )
-
-
 
