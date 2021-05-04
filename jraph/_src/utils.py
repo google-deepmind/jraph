@@ -15,8 +15,7 @@
 """Utilities for working with `GraphsTuple`s."""
 
 import functools
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, \
-  Union
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Union
 
 import jax
 from jax import lax
@@ -484,6 +483,17 @@ def concatenated_args(
   return _decorate
 
 
+def dtype_max_value(dtype):
+  if dtype.kind == 'f':
+    return jnp.inf
+  elif dtype.kind == 'i':
+    return jnp.iinfo(dtype).max
+  elif dtype.kind == 'b':
+    return True
+  else:
+    raise ValueError(f'Invalid data type {dtype.kind!r}.')
+
+
 def dtype_min_value(dtype):
   if dtype.kind == 'f':
     return -jnp.inf
@@ -528,6 +538,42 @@ def segment_max(data, segment_ids, num_segments=None,
   out = jnp.full((num_segments,) + data.shape[1:], min_value, dtype=data.dtype)
   segment_ids = jnp.mod(segment_ids, num_segments)
   return jax.ops.index_max(
+      out, segment_ids, data, indices_are_sorted, unique_indices)
+
+
+def segment_min(data, segment_ids, num_segments=None,
+                indices_are_sorted=False, unique_indices=False):
+  """Computes the min within segments of an array.
+
+  Similar to TensorFlow's segment_min:
+  https://www.tensorflow.org/api_docs/python/tf/math/segment_min
+
+  Args:
+    data: an array with the values to be maxed over.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be min'd over. Values can be repeated
+      and need not be sorted. Values outside of the range [0, num_segments) are
+      wrapped into that range by applying jnp.mod.
+    num_segments: optional, an int with positive value indicating the number of
+      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
+      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
+      the output, a static value must be provided to use ``segment_max`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
+
+  Returns:
+    An array with shape ``(num_segments,) + data.shape[1:]`` representing
+    the segment mins.
+  """
+  if num_segments is None:
+    num_segments = jnp.maximum(jnp.max(segment_ids) + 1, jnp.max(-segment_ids))
+  num_segments = int(num_segments)
+
+  max_value = dtype_max_value(data.dtype)
+  out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
+  segment_ids = jnp.mod(segment_ids, num_segments)
+  return jax.ops.index_min(
       out, segment_ids, data, indices_are_sorted, unique_indices)
 
 

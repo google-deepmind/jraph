@@ -415,6 +415,48 @@ class GraphTest(test_util.JaxTestCase):
                             (True, False),
                             (True, True),
                             (False, True))
+  def test_segment_min(self, indices_are_sorted, unique_indices):
+    inf = jnp.iinfo(jnp.int32).max
+    if unique_indices:
+      data = jnp.arange(6)
+      if indices_are_sorted:
+        segment_ids = jnp.array([0, 1, 2, 3, 4, 5])
+        expected_out = jnp.array([0, 1, 2, 3, 4, 5])
+        num_segments = 6
+      else:
+        segment_ids = jnp.array([1, 0, 2, 4, 3, -5])
+        expected_out = jnp.array([1, 0, 2, 4, 3])
+        num_segments = 5
+    else:
+      data = jnp.arange(9)
+      if indices_are_sorted:
+        segment_ids = jnp.array([0, 0, 0, 1, 1, 1, 2, 3, 4])
+        expected_out = jnp.array([0, 3, 6, 7, 8, inf])
+      else:
+        segment_ids = jnp.array([0, 1, 2, 0, 4, 0, 1, 1, -6])
+        expected_out = jnp.array([0, 1, 2, inf, 4, inf])
+      num_segments = 6
+
+    with self.subTest('nojit'):
+      result = utils.segment_min(data, segment_ids, num_segments,
+                                 indices_are_sorted, unique_indices)
+      self.assertAllClose(result, expected_out, check_dtypes=True)
+      result = utils.segment_min(data, segment_ids,
+                                 indices_are_sorted=indices_are_sorted,
+                                 unique_indices=unique_indices)
+      num_unique_segments = jnp.maximum(jnp.max(segment_ids) + 1,
+                                        jnp.max(-segment_ids))
+      self.assertAllClose(result, expected_out[:num_unique_segments],
+                          check_dtypes=True)
+    with self.subTest('jit'):
+      result = jax.jit(utils.segment_min, static_argnums=(2, 3, 4))(
+          data, segment_ids, num_segments, indices_are_sorted, unique_indices)
+      self.assertAllClose(result, expected_out, check_dtypes=True)
+
+  @parameterized.parameters((False, False),
+                            (True, False),
+                            (True, True),
+                            (False, True))
   def test_segment_max_negatives(self, indices_are_sorted, unique_indices):
     neg_inf = jnp.iinfo(jnp.int32).min
     if unique_indices:

@@ -55,7 +55,10 @@ from jraph._src.utils import pad_with_graphs
 from jraph._src.utils import partition_softmax
 from jraph._src.utils import segment_max
 from jraph._src.utils import segment_mean
+from jraph._src.utils import segment_min
+from jraph._src.utils import segment_normalize
 from jraph._src.utils import segment_softmax
+from jraph._src.utils import segment_variance
 from jraph._src.utils import unbatch
 from jraph._src.utils import unpad_with_graphs
 
