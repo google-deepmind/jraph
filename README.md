@@ -6,7 +6,7 @@
 
 Jraph (pronounced "giraffe") is a lightweight library for working with graph
 neural networks in jax. It provides a data structure for graphs, a set of
-utilites for working with graphs, and a 'zoo' of forkable graph neural network
+utilities for working with graphs, and a 'zoo' of forkable graph neural network
 models.
 
 ## Installation
@@ -26,7 +26,7 @@ doesn't prescribe a way to write or develop graph neural networks.
 
 *   `graph.py` provides a lightweight data structure, `GraphsTuple`, for working
     with graphs.
-*   `utils.py` provides utilies for working with `GraphsTuples` in jax.
+*   `utils.py` provides utilities for working with `GraphsTuples` in jax.
     *   Utilities for batching datasets of `GraphsTuples`.
     *   Utilities to support jit compilation of variable shaped graphs via
         padding and masking.
