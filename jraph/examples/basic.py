@@ -46,7 +46,7 @@ def run():
       senders=np.array([0, 1]), receivers=np.array([2, 2]))
   logging.info("Single graph %r", single_graph)
 
-  # Creates a GraphsTuple from scatch containing a single graph with nested
+  # Creates a GraphsTuple from scratch containing a single graph with nested
   # feature vectors.
   # The graph has 3 nodes and 2 edges.
   # The feature vector can be arbitrary nested types of dict, list and tuple,
