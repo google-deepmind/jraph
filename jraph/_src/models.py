@@ -303,9 +303,9 @@ EmbedNodeFn = Callable[[NodeFeatures], NodeFeatures]
 EmbedGlobalFn = Callable[[Globals], Globals]
 
 
-def GraphMapFeatures(embed_edge_fn: EmbedEdgeFn = None,
-                     embed_node_fn: EmbedNodeFn = None,
-                     embed_global_fn: EmbedGlobalFn = None):
+def GraphMapFeatures(embed_edge_fn: Optional[EmbedEdgeFn] = None,
+                     embed_node_fn: Optional[EmbedNodeFn] = None,
+                     embed_global_fn: Optional[EmbedGlobalFn] = None):
   """Returns function which embeds the components of a graph independently.
 
   Args:
@@ -392,7 +392,7 @@ def GraphNetGAT(
     update_node_fn: GNUpdateNodeFn,
     attention_logit_fn: AttentionLogitFn,
     attention_reduce_fn: AttentionReduceFn,
-    update_global_fn: GNUpdateGlobalFn = None,
+    update_global_fn: Optional[GNUpdateGlobalFn] = None,
     aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
     aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = jax.ops.
     segment_sum,
@@ -441,7 +441,7 @@ GATNodeUpdateFn = Callable[[NodeFeatures], NodeFeatures]
 
 def GAT(attention_query_fn: GATAttentionQueryFn,
         attention_logit_fn: GATAttentionLogitFn,
-        node_update_fn: GATNodeUpdateFn = None):
+        node_update_fn: Optional[GATNodeUpdateFn] = None):
   """Returns a method that applies a Graph Attention Network layer.
 
   Graph Attention message passing as described in
