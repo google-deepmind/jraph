@@ -51,7 +51,7 @@ import jax.numpy as jnp
 # Define a three node graph, each node has an integer as its feature.
 node_features = jnp.array([[0.], [1.], [2.]])
 
-# We will construct a graph fro which there is a directed edge between each node
+# We will construct a graph for which there is a directed edge between each node
 # and its successor. We define this with `senders` (source nodes) and `receivers`
 # (destination nodes).
 senders = jnp.array([0, 1, 2])
