@@ -48,7 +48,7 @@ EMBEDDING_SIZE = 32
 HIDDEN_SIZE = 128
 
 # Immutable class for storing nested node/edge features containing an embedding
-# and a recurrent state..
+# and a recurrent state.
 StatefulField = collections.namedtuple("StatefulField", ["embedding", "state"])
 
 
@@ -72,7 +72,7 @@ def network_definition(graph: jraph.GraphsTuple) -> jraph.ArrayTree:
   # MLPs used in the edge and the node model. Note that in this instance
   # the output size matches the input size so the same model can be run
   # iteratively multiple times. In a real model, this would usually be achieved
-  # by first using an encoder in the input datainto a common `EMBEDDING_SIZE`.
+  # by first using an encoder in the input data into a common `EMBEDDING_SIZE`.
   edge_fn_mlp = hk.nets.MLP([HIDDEN_SIZE, EMBEDDING_SIZE])
   node_fn_mlp = hk.nets.MLP([HIDDEN_SIZE, EMBEDDING_SIZE])
 
