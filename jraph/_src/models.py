@@ -93,8 +93,7 @@ def GraphNetwork(
     attention_reduce_fn: Optional[AttentionReduceFn] = None):
   """Returns a method that applies a configured GraphNetwork.
 
-  This implementation follows Algorithm 1 in
-  https://arxiv.org/pdf/1806.01261.pdf
+  This implementation follows Algorithm 1 in https://arxiv.org/abs/1806.01261
 
   There is one difference. For the nodes update the class aggregates over the
   sender edges and receiver edges separately. This is a bit more general
@@ -143,8 +142,7 @@ def GraphNetwork(
   def _ApplyGraphNet(graph):
     """Applies a configured GraphNetwork to a graph.
 
-    This implementation follows Algorithm 1 in
-    https://arxiv.org/pdf/1806.01261.pdf
+    This implementation follows Algorithm 1 in https://arxiv.org/abs/1806.01261
 
     There is one difference. For the nodes update the class aggregates over the
     sender edges and receiver edges separately. This is a bit more general
@@ -445,7 +443,7 @@ def GAT(attention_query_fn: GATAttentionQueryFn,
   """Returns a method that applies a Graph Attention Network layer.
 
   Graph Attention message passing as described in
-  https://arxiv.org/pdf/1710.10903.pdf. This model expects node features as a
+  https://arxiv.org/abs/1710.10903. This model expects node features as a
   jnp.array, may use edge features for computing attention weights, and
   ignore global features. It does not support nests.
 
