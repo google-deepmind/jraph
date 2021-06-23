@@ -17,7 +17,7 @@ Jraph can be installed directly from github using the following command:
 
 The examples require additional dependencies. To install them please run:
 
-```pip install pip install git+git://github.com/deepmind/jraph.git[examples, ogb_examples]```
+```pip install "jraph[examples, ogb_examples] @ git+git://github.com/deepmind/jraph.git"```
 
 ## Overview
 
