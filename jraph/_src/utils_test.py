@@ -182,6 +182,21 @@ class GraphTest(test_util.JaxTestCase):
     self.assertAllClose(
         graphs_tuples, list_graphs_tuple[:-1], check_dtypes=False)
 
+  def test_batch_np(self):
+    """Tests batching of graph in numpy."""
+    (list_graphs_tuple, batched_graphs_tuple) = _get_list_and_batched_graph()
+    graphs_tuple = utils.batch_np(list_graphs_tuple)
+    self.assertAllClose(graphs_tuple, batched_graphs_tuple, check_dtypes=False)
+
+  def test_unbatch_np(self):
+    """Tests unbatching of graph in numpy."""
+    (list_graphs_tuple, batched_graphs_tuple) = _get_list_and_batched_graph()
+    graphs_tuples = utils.unbatch_np(batched_graphs_tuple)
+    # The final GraphsTuple does not contain a graph, and so shouldn't be
+    # present in the result.
+    self.assertAllClose(
+        graphs_tuples, list_graphs_tuple[:-1], check_dtypes=False)
+
   @parameterized.parameters((True, True, False),
                             (True, False, True),
                             (False, True, True))

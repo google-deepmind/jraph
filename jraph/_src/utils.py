@@ -147,6 +147,11 @@ def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
   return _batch(graphs, np_=jnp)
 
 
+def batch_np(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
+  """Numpy implementation of `batch`. See `batch` for more details."""
+  return _batch(graphs, np_=np)
+
+
 def _batch(graphs, np_):
   """Returns batched graph given a list of graphs and a numpy-like module."""
   # Calculates offsets for sender and receiver arrays, caused by concatenating
@@ -179,6 +184,11 @@ def unbatch(graph: gn_graph.GraphsTuple) -> List[gn_graph.GraphsTuple]:
     graph: the batched graph, which will be unbatched into a list of graphs.
   """
   return _unbatch(graph, np_=jnp)
+
+
+def unbatch_np(graph: gn_graph.GraphsTuple) -> List[gn_graph.GraphsTuple]:
+  """Numpy implementation of `unbatch`. See `unbatch` for more details."""
+  return _unbatch(graph, np_=np)
 
 
 def _unbatch(
