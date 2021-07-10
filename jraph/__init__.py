@@ -43,6 +43,7 @@ from jraph._src.models import NodeFeatures
 from jraph._src.models import RelationNetwork
 from jraph._src.utils import ArrayTree
 from jraph._src.utils import batch
+from jraph._src.utils import batch_np
 from jraph._src.utils import concatenated_args
 from jraph._src.utils import get_edge_padding_mask
 from jraph._src.utils import get_fully_connected_graph
@@ -60,6 +61,7 @@ from jraph._src.utils import segment_normalize
 from jraph._src.utils import segment_softmax
 from jraph._src.utils import segment_variance
 from jraph._src.utils import unbatch
+from jraph._src.utils import unbatch_np
 from jraph._src.utils import unpad_with_graphs
 
 __version__ = "0.0.1.dev"
@@ -72,8 +74,8 @@ __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "GNUpdateEdgeFn", "GNUpdateNodeFn", "GNUpdateGlobalFn",
            "InteractionUpdateNodeFn", "InteractionUpdateEdgeFn", "EmbedEdgeFn",
            "EmbedNodeFn", "EmbedGlobalFn", "GATAttentionQueryFn",
-           "GATAttentionLogitFn", "GATNodeUpdateFn", "batch",
-           "unbatch", "pad_with_graphs",
+           "GATAttentionLogitFn", "GATNodeUpdateFn", "batch", "batch_np",
+           "unbatch", "unbatch_np", "pad_with_graphs",
            "get_number_of_padding_with_graphs_graphs",
            "get_number_of_padding_with_graphs_nodes",
            "get_number_of_padding_with_graphs_edges", "unpad_with_graphs",
