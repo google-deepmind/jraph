@@ -21,7 +21,6 @@ import logging
 
 from absl import app
 import jax
-import jax.numpy as jnp
 import jraph
 import numpy as np
 
@@ -72,6 +71,13 @@ def run():
       senders=np.array([0, 1, 3]), receivers=np.array([2, 2, 3]))
   logging.info("Implicitly batched graph %r", implicitly_batched_graph)
 
+  # Batching graphs can be challenging. There are in general two approaches:
+  # 1. Implicit batching: Independent graphs are combined into the same
+  #    GraphsTuple first, and the padding is added to the combined graph.
+  # 2. Explicit batching: Pad all graphs to a maximum size, stack them together
+  #    using an explicit batch dimension followed by jax.vmap.
+  # Both approaches are shown below.
+
   # Creates a GraphsTuple from two existing GraphsTuple using an implicit
   # batch dimension.
   # The GraphsTuple will contain three graphs.
@@ -103,7 +109,7 @@ def run():
   # An explicit batch dimension requires more memory, but can simplify
   # the definition of functions operating on the graph.
   # Explicitly batched graphs require the GraphNetwork to be transformed
-  # by jax.mask followed by jax.vmap.
+  # by jax.vmap.
   # Using an explicit batch requires padding all feature vectors to
   # the maximum size of nodes and edges.
   # The first graph has 3 nodes and 2 edges.
@@ -195,46 +201,11 @@ def run():
   updated_graph = network(padded_graph)
   logging.info("Updated graph from padded graph %r", updated_graph)
 
-  # Runs graph propagation on an explicitly batched graph.
-  # WARNING: This code relies on an undocumented JAX feature (jax.mask) which
-  # might stop working at any time!
-  graph_shape = jraph.GraphsTuple(
-      n_node="(g)",
-      n_edge="(g)",
-      nodes="(n, {})".format(explicitly_batched_graph.nodes.shape[-1]),
-      edges="(e, {})".format(explicitly_batched_graph.edges.shape[-1]),
-      globals="(g, {})".format(explicitly_batched_graph.globals.shape[-1]),
-      senders="(e)",
-      receivers="(e)")
-  batch_size = explicitly_batched_graph.globals.shape[0]
-  logical_env = {"g": jnp.ones(batch_size, dtype=jnp.int32),
-                 "n": jnp.sum(explicitly_batched_graph.n_node, axis=-1),
-                 "e": jnp.sum(explicitly_batched_graph.n_edge, axis=-1)}
-  try:
-    propagation_fn = jax.vmap(jax.mask(
-        network, in_shapes=[graph_shape], out_shape=graph_shape))
-    updated_graph = propagation_fn([explicitly_batched_graph], logical_env)
-    logging.info("Updated graph from explicitly batched graph %r",
-                 updated_graph)
-  except Exception:  # pylint: disable=broad-except
-    logging.warning(MASK_BROKEN_MSG)
-
   # JIT-compile graph propagation.
   # Use padded graphs to avoid re-compilation at every step!
   jitted_network = jax.jit(network)
   updated_graph = jitted_network(padded_graph)
   logging.info("(JIT) updated graph from padded graph %r", updated_graph)
-
-  # Or use an explicit batch dimension.
-  try:
-    jitted_propagation_fn = jax.jit(propagation_fn)
-    updated_graph = jitted_propagation_fn(
-        [explicitly_batched_graph], logical_env)
-    logging.info("(JIT) Updated graph from explicitly batched graph %r",
-                 updated_graph)
-  except Exception:  # pylint: disable=broad-except
-    logging.warning(MASK_BROKEN_MSG)
-
   logging.info("basic.py complete!")
 
 
