@@ -15,7 +15,7 @@
 """Utilities for working with `GraphsTuple`s."""
 
 import functools
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Sequence, Union
+from typing import Any, Callable, Generator, Iterable, Iterator, List, Mapping, Optional, Sequence, Union
 
 import jax
 from jax import lax
@@ -722,3 +722,93 @@ def get_fully_connected_graph(n_node_per_graph: int,
       globals=global_features,
   )
 
+_NUMBER_FIELDS = ('n_node', 'n_edge', 'n_graph')
+
+
+def _get_graph_size(graphs_tuple):
+  n_node = np.sum(graphs_tuple.n_node)
+  n_edge = len(graphs_tuple.senders)
+  n_graph = len(graphs_tuple.n_node)
+  return n_node, n_edge, n_graph
+
+
+def _is_over_batch_size(graph, graph_batch_size):
+  graph_size = _get_graph_size(graph)
+  return any([x > y for x, y in zip(graph_size, graph_batch_size)])
+
+
+def dynamically_batch(
+    graphs_tuple_iterator: Iterator[gn_graph.GraphsTuple], n_node: int,
+    n_edge: int, n_graph: int) -> Generator[gn_graph.GraphsTuple, None, None]:
+  """Dynamically batches trees with `jraph.GraphsTuples` up to specified sizes.
+
+
+  Elements of the `graphs_tuple_iterator` will be incrementally added to a batch
+  until the limits defined by `n_node`, `n_edge` and `n_graph` are reached. This
+  means each element yielded by this generator may have a differing number of
+  graphs in its batch.
+
+  Args:
+    graphs_tuple_iterator: An iterator of `jraph.GraphsTuples`.
+    n_node: The maximum number of nodes in a batch, at least the maximum sized
+      graph + 1.
+    n_edge: The maximum number of edges in a batch, at least the maximum sized
+      graph.
+    n_graph: The maximum number of graphs in a batch, at least 2.
+
+  Yields:
+    A `jraph.GraphsTuple` batch of graphs.
+
+  Raises:
+    ValueError: if the number of graphs is < 2.
+    RuntimeError: if the `graphs_tuple_iterator` contains elements which are not
+      `jraph.GraphsTuple`s.
+    RuntimeError: if a graph is found which is larger than the batch size.
+  """
+  if n_graph < 2:
+    raise ValueError('The number of graphs in a batch size must be greater or '
+                     f'equal to `2` for padding with graphs, got {n_graph}.')
+  valid_batch_size = (n_node - 1, n_edge, n_graph - 1)
+  accumulated_graphs = []
+  num_accumulated_nodes = 0
+  num_accumulated_edges = 0
+  num_accumulated_graphs = 0
+  for element in graphs_tuple_iterator:
+    element_nodes, element_edges, element_graphs = _get_graph_size(element)
+    if _is_over_batch_size(element, valid_batch_size):
+      graph_size = element_nodes, element_edges, element_graphs
+      graph_size = {k: v for k, v in zip(_NUMBER_FIELDS, graph_size)}
+      batch_size = {k: v for k, v in zip(_NUMBER_FIELDS, valid_batch_size)}
+      raise RuntimeError('Found graph bigger than batch size. Valid Batch '
+                         f'Size: {batch_size}, Graph Size: {graph_size}')
+
+    # If this is the first element of the batch, set it and continue.
+    # Otherwise check if there is space for the graph in the batch:
+    #   if there is, add it to the batch
+    #   if there isn't, return the old batch and start a new batch.
+    if not accumulated_graphs:
+      accumulated_graphs = [element]
+      num_accumulated_nodes = element_nodes
+      num_accumulated_edges = element_edges
+      num_accumulated_graphs = element_graphs
+      continue
+    else:
+      if ((num_accumulated_graphs + element_graphs > n_graph - 1) or
+          (num_accumulated_nodes + element_nodes > n_node - 1) or
+          (num_accumulated_edges + element_edges > n_edge)):
+        batched_graph = batch_np(accumulated_graphs)
+        yield pad_with_graphs(batched_graph, n_node, n_edge, n_graph)
+        accumulated_graphs = [element]
+        num_accumulated_nodes = element_nodes
+        num_accumulated_edges = element_edges
+        num_accumulated_graphs = element_graphs
+      else:
+        accumulated_graphs.append(element)
+        num_accumulated_nodes += element_nodes
+        num_accumulated_edges += element_edges
+        num_accumulated_graphs += element_graphs
+
+  # We may still have data in batched graph.
+  if accumulated_graphs:
+    batched_graph = batch_np(accumulated_graphs)
+    yield pad_with_graphs(batched_graph, n_node, n_edge, n_graph)

@@ -14,10 +14,12 @@
 # limitations under the License.
 """Tests for jraph.utils."""
 
+import os
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax import test_util
+from jax.lib import xla_bridge
 import jax.numpy as jnp
 import jax.tree_util as tree
 from jraph._src import graph
@@ -669,6 +671,142 @@ class ConcatenatedArgsWrapperTest(test_util.JaxTestCase):
         list(tree.tree_flatten(args)[0]) + list(tree.tree_flatten(kwargs)[0]),
         axis=axis)
     self.assertArraysAllClose(out, expected_out, check_dtypes=True)
+
+
+_DB_NUM_NODES = (10, 15)
+_DB_NODE_SHAPE = (3, 4, 1)
+_DB_NUM_EDGES = (12, 17)
+_DB_EDGE_SHAPE = (4, 3)
+_DB_GLOBAL_SHAPE = (2, 3, 1, 4)
+
+
+def _make_dynamic_batch_graph(add_globals):
+  total_num_edges = sum(_DB_NUM_EDGES)
+  total_num_nodes = sum(_DB_NUM_NODES)
+  g_ = _make_nest(
+      np.random.normal(size=_DB_GLOBAL_SHAPE)) if add_globals else {}
+  return graph.GraphsTuple(
+      nodes=_make_nest(
+          np.random.normal(size=(total_num_nodes,) + _DB_NODE_SHAPE)),
+      edges=_make_nest(
+          np.random.normal(size=(total_num_edges,) + _DB_EDGE_SHAPE)),
+      n_edge=np.array(_DB_NUM_EDGES),
+      n_node=np.array(_DB_NUM_NODES),
+      senders=np.random.randint(
+          0, total_num_nodes, size=total_num_edges, dtype=np.int32),
+      receivers=np.random.randint(
+          0, total_num_nodes, size=total_num_edges, dtype=np.int32),
+      globals=g_)
+
+
+class DynamicBatchTest(test_util.JaxTestCase):
+
+  def setUp(self):
+    super().setUp()
+    os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=4'
+    xla_bridge.get_backend.cache_clear()
+    self._global_graph = _make_dynamic_batch_graph(add_globals=True)
+
+  @parameterized.named_parameters(
+      ('graph_with_globals_n_node_hit', True, {
+          'n_node': sum(_DB_NUM_NODES) + 1,
+          'n_edge': sum(_DB_NUM_EDGES) + 100,
+          'n_graph': len(_DB_NUM_EDGES) + 100
+      }),
+      ('graph_with_globals_n_edge_hit', True, {
+          'n_node': sum(_DB_NUM_NODES) + 100,
+          'n_edge': sum(_DB_NUM_EDGES),
+          'n_graph': len(_DB_NUM_EDGES) + 100
+      }),
+      ('graph_with_globals_n_graph_hit', True, {
+          'n_node': sum(_DB_NUM_NODES) + 100,
+          'n_edge': sum(_DB_NUM_EDGES) + 100,
+          'n_graph': len(_DB_NUM_EDGES) + 1
+      }),
+      (
+          'graph_with_globals_no_budget_hit',
+          False,
+          {
+              # Add enough padding so not enough for a single extra graph.
+              'n_node': sum(_DB_NUM_NODES) + 5,
+              'n_edge': sum(_DB_NUM_EDGES) + 5,
+              'n_graph': len(_DB_NUM_EDGES) + 5
+          }),
+      (
+          'graph_no_globals_no_budget_hit',
+          False,
+          {
+              # Add enough padding so not enough for a single extra graph.
+              'n_node': sum(_DB_NUM_NODES) + 5,
+              'n_edge': sum(_DB_NUM_EDGES) + 5,
+              'n_graph': len(_DB_NUM_EDGES) + 5
+          }),
+      (
+          'graph_nests_no_globals_no_budget_hit',
+          False,
+          {
+              # Add enough padding so not enough for a single extra graph.
+              'n_node': sum(_DB_NUM_NODES) + 5,
+              'n_edge': sum(_DB_NUM_EDGES) + 5,
+              'n_graph': len(_DB_NUM_EDGES) + 5
+          }))
+  def test_dynamically_batch(self, use_globals, batch_kwargs):
+
+    def graph_iterator():
+      graphs = [
+          _make_dynamic_batch_graph(add_globals=use_globals) for x in range(4)]
+      return iter(graphs + utils.unbatch_np(graphs[-1]))
+
+    batched_dataset = utils.dynamically_batch(graph_iterator(),
+                                              **batch_kwargs)
+    batched_graphs = []
+    while True:
+      try:
+        batched_graphs.append(next(batched_dataset))
+      except StopIteration:
+        break
+
+    self.assertLen(batched_graphs, 5)
+    for batch_graphs in batched_graphs:
+      batch_nodes = jax.tree_util.tree_flatten(batch_graphs.nodes)[0]
+      for nodes in batch_nodes:
+        self.assertEqual(nodes.shape[0], batch_kwargs['n_node'])
+      batch_edges = jax.tree_util.tree_flatten(batch_graphs.edges)[0]
+      for edges in batch_edges:
+        self.assertEqual(edges.shape[0], batch_kwargs['n_edge'])
+      self.assertLen(batch_graphs.n_node, batch_kwargs['n_graph'])
+      self.assertEqual(
+          utils.get_number_of_padding_with_graphs_nodes(batch_graphs),
+          batch_kwargs['n_node'] - sum(_DB_NUM_NODES))
+      self.assertEqual(
+          utils.get_number_of_padding_with_graphs_edges(batch_graphs),
+          batch_kwargs['n_edge'] - sum(_DB_NUM_EDGES))
+
+  def test_too_big_graphs_tuple(self):
+    with self.subTest('test_too_big_nodes'):
+      iterator = utils.dynamically_batch(
+          iter([self._global_graph]), n_node=15, n_edge=50, n_graph=10)
+      self.assertRaisesRegex(
+          RuntimeError, 'Found graph bigger than batch size.*',
+          lambda: next(iterator))
+    with self.subTest('test_too_big_edges'):
+      iterator = utils.dynamically_batch(
+          iter([self._global_graph]), n_node=26, n_edge=15, n_graph=10)
+      self.assertRaisesRegex(
+          RuntimeError, 'Found graph bigger than batch size.*',
+          lambda: next(iterator))
+    with self.subTest('test_too_big_graphs'):
+      iterator = utils.dynamically_batch(
+          iter([self._global_graph]), n_node=50, n_edge=50, n_graph=1)
+      self.assertRaisesRegex(
+          ValueError, 'The number of graphs*',
+          lambda: next(iterator))
+
+  def test_not_enough_graphs(self):
+    iterator = utils.dynamically_batch(
+        iter([self._global_graph]), n_node=5, n_edge=5, n_graph=1)
+    self.assertRaisesRegex(
+        ValueError, 'The number of graphs*', lambda: next(iterator))
 
 
 if __name__ == '__main__':
