@@ -812,3 +812,108 @@ def dynamically_batch(
   if accumulated_graphs:
     batched_graph = batch_np(accumulated_graphs)
     yield pad_with_graphs(batched_graph, n_node, n_edge, n_graph)
+
+
+def _expand_trailing_dimensions(
+    array: jnp.ndarray, template: jnp.ndarray) -> jnp.ndarray:
+  missing_dims = len(template.shape) - len(array.shape)
+  out = jnp.reshape(array, array.shape + (1,) * missing_dims)
+  assert out.dtype == array.dtype
+  return out
+
+
+def _get_zero_fn(mask: jnp.ndarray) -> Callable[[jnp.ndarray], jnp.ndarray]:
+  return lambda x: _expand_trailing_dimensions(mask, x) * x
+
+
+def zero_out_padding(graph: gn_graph.GraphsTuple) -> gn_graph.GraphsTuple:
+  """Zeroes out padded graphs values.
+
+  Padded graphs can cause numeric overflow issues when a node has a large number
+  connecting edges, and the graph network has many layers. By inserting this
+  zeroing function between layers of the graph network these issues may be
+  addressed.
+
+  Zeroing is performed by multiplying a boolean mask with the corresponding
+  array of the input dtype, assuming correct type casting happens.
+
+  For example::
+
+    # Set up padded jraph.GraphsTuple & simple jraph.GraphNetwork.
+    key = jax.random.PRNGKey(0)
+    graph = jraph.GraphsTuple(nodes=jax.random.randint(key, (3,), 0, 1,
+    dtype=jnp.int32),
+                      edges=jax.random.randint(key, (5,), 0, 1,
+                      dtype=jnp.int32),
+                      senders=jnp.array([0,0,1,1,2]),
+                      receivers=[1,2,0,2,1],
+                      n_node=jnp.array([3]),
+                      n_edge=jnp.array([5]),
+                      globals=jax.random.randint(key, (1,), 0, 128,
+                      dtype=jnp.int32))
+    padded_graph = jraph.pad_with_graphs(graph, n_node=4, n_edge=100, n_graph=2)
+
+    def net_fn(graph: jraph.GraphsTuple) -> jraph.GraphsTuple:
+      embedder = jraph.GraphMapFeatures(
+          hk.Embed(2, 1), hk.Embed(2, 1), hk.Embed(2, 1))
+      update_fn = jraph.concatenated_args(lambda x: jnp.sum(x, -1,
+      keepdims=True))
+      net = jraph.GraphNetwork(
+          update_node_fn=update_fn,
+          update_edge_fn=update_fn,
+          update_global_fn=update_fn)
+      embedded = embedder(graph)
+      return net(embedded)
+
+    net = haiku.without_apply_rng(haiku.transform(net_fn))
+    params = net.init(key, padded_graph)
+
+    # Without zeroing.
+    net.apply(params, padded_graph).nodes
+    >> [[ -1.1949954]
+        [ -1.4456191]
+        [ -1.1949954]
+        [-88.505775 ]] # Very large activation in a single node.
+
+    # With zeroing.
+    zero_out_padding(net.apply(params, padded_graph)).nodes
+    >> [[ -1.1949954]
+        [ -1.4456191]
+        [ -1.1949954]
+        [-0. ]]  # Zeroed out activation.
+
+  Args:
+    graph: A padded graph.
+
+  Returns:
+    A graph with the same valid values as input, but padded values zeroed out.
+  """
+  edge_mask = get_edge_padding_mask(graph)
+  edge_mask = jax.tree_map(_get_zero_fn(edge_mask), graph.edges)
+  node_mask = get_node_padding_mask(graph)
+  node_mask = jax.tree_map(_get_zero_fn(node_mask), graph.nodes)
+  global_mask = get_graph_padding_mask(graph)
+  global_mask = jax.tree_map(_get_zero_fn(global_mask), graph.globals)
+  return graph._replace(
+      nodes=graph.nodes * node_mask,
+      edges=graph.edges * edge_mask,
+      globals=graph.globals * global_mask)
+
+
+def with_zero_out_padding_outputs(
+    graph_net: Callable[[gn_graph.GraphsTuple], gn_graph.GraphsTuple]
+) -> Callable[[gn_graph.GraphsTuple], gn_graph.GraphsTuple]:
+  """A wrapper for graph to graph functions that zeroes padded d output values.
+
+  See `zero_out_padding` for a full explanation of the method.
+
+  Args:
+    graph_net: A Graph Neural Network.
+
+  Returns:
+    A Graph Neural Network that will zero out all output padded values.
+  """
+  @functools.wraps(graph_net)
+  def wrapper(graph: gn_graph.GraphsTuple) -> gn_graph.GraphsTuple:
+    return zero_out_padding(graph_net(graph))
+  return wrapper

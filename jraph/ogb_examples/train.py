@@ -94,6 +94,7 @@ def update_global_fn(feats: jnp.ndarray) -> jnp.ndarray:
 
 
 def net_fn(graph: jraph.GraphsTuple) -> jraph.GraphsTuple:
+  """Graph net function."""
   # Add a global paramater for graph classification.
   graph = graph._replace(globals=jnp.zeros([graph.n_node.shape[0], 1]))
   embedder = jraph.GraphMapFeatures(

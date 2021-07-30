@@ -809,5 +809,46 @@ class DynamicBatchTest(test_util.JaxTestCase):
         ValueError, 'The number of graphs*', lambda: next(iterator))
 
 
+class ZeroOutTest(test_util.JaxTestCase):
+
+  def _assert_values_for_graph(self, padded_graph, wrapper):
+    # Make padded graph values non zero.
+    padded_graph = padded_graph._replace(
+        nodes=tree.tree_map(jnp.ones_like, padded_graph.nodes),
+        edges=tree.tree_map(jnp.ones_like, padded_graph.edges),
+        globals=tree.tree_map(jnp.ones_like, padded_graph.globals))
+    if wrapper:
+      zeroed_graph_net = utils.with_zero_out_padding_outputs(lambda x: x)
+      zeroed_padded_graph = zeroed_graph_net(padded_graph)
+    else:
+      zeroed_padded_graph = utils.zero_out_padding(padded_graph)
+    graphs = utils.unbatch(zeroed_padded_graph)
+    valid_graph = graphs[0]
+    padding_graphs = graphs[1:]
+    tree.tree_multimap(lambda x: self.assertArraysEqual(x, jnp.ones_like(x)),
+                       valid_graph.nodes)
+    for padding_graph in padding_graphs:
+      tree.tree_multimap(lambda x: self.assertArraysEqual(x, jnp.zeros_like(x)),
+                         padding_graph.nodes)
+
+  @parameterized.parameters(True, False)
+  def test_zero_padding_values(self, wrapper):
+    g = _get_random_graph(max_n_graph=1)
+    with self.subTest('test_all_padded_features'):
+      self._assert_values_for_graph(
+          utils.pad_with_graphs(g, n_node=20, n_edge=20, n_graph=3),
+          wrapper=wrapper)
+    with self.subTest('test_no_edge_features'):
+      self._assert_values_for_graph(
+          utils.pad_with_graphs(
+              g, n_node=sum(g.n_node) + 1, n_edge=sum(g.n_edge), n_graph=3),
+          wrapper=wrapper)
+    with self.subTest('test_no_extra_graph_features'):
+      self._assert_values_for_graph(
+          utils.pad_with_graphs(
+              g, n_node=sum(g.n_node) + 1, n_edge=sum(g.n_edge), n_graph=2),
+          wrapper=wrapper)
+
+
 if __name__ == '__main__':
   absltest.main()

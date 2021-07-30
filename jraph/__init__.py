@@ -64,6 +64,9 @@ from jraph._src.utils import segment_variance
 from jraph._src.utils import unbatch
 from jraph._src.utils import unbatch_np
 from jraph._src.utils import unpad_with_graphs
+from jraph._src.utils import with_zero_out_padding_outputs
+from jraph._src.utils import zero_out_padding
+
 
 __version__ = "0.0.1.dev"
 
@@ -83,7 +86,8 @@ __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "get_node_padding_mask", "get_edge_padding_mask",
            "get_graph_padding_mask", "segment_max", "segment_softmax",
            "partition_softmax", "concatenated_args",
-           "get_fully_connected_graph", "dynamically_batch")
+           "get_fully_connected_graph", "dynamically_batch",
+           "with_zero_out_padding_outputs", "zero_out_padding")
 
 #  _________________________________________
 # / Please don't use symbols in `_src` they \
