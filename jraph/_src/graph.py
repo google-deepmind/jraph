@@ -14,7 +14,7 @@
 # limitations under the License.
 """Graph Data Structures."""
 
-from typing import Any, NamedTuple, Iterable, Mapping, Union
+from typing import Any, NamedTuple, Iterable, Mapping, Union, Optional
 import jax.numpy as jnp
 
 
@@ -97,10 +97,10 @@ class GraphsTuple(NamedTuple):
 
 
   """
-  nodes: ArrayTree
-  edges: ArrayTree
-  receivers: jnp.ndarray  # with integer dtype
-  senders: jnp.ndarray  # with integer dtype
-  globals: ArrayTree
+  nodes: Optional[ArrayTree]
+  edges: Optional[ArrayTree]
+  receivers: Optional[jnp.ndarray]  # with integer dtype
+  senders: Optional[jnp.ndarray]  # with integer dtype
+  globals: Optional[ArrayTree]
   n_node: jnp.ndarray  # with integer dtype
   n_edge: jnp.ndarray   # with integer dtype
