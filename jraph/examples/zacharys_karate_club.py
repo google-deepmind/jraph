@@ -71,7 +71,10 @@ def get_ground_truth_assignments_for_zacharys_karate_club() -> jnp.ndarray:
 
 
 def network_definition(graph: jraph.GraphsTuple) -> jraph.ArrayTree:
-  """Defines a graph neural network.
+  """Implements the GCN from Kipf et al https://arxiv.org/pdf/1609.02907.pdf.
+
+     A' = D^{-0.5} A D^{-0.5}
+     Z = f(X, A') = A' relu(A' X W_0) W_1
 
   Args:
     graph: GraphsTuple the network processes.
@@ -80,12 +83,12 @@ def network_definition(graph: jraph.GraphsTuple) -> jraph.ArrayTree:
     processed nodes.
   """
   gn = jraph.GraphConvolution(
-      update_node_fn=lambda n: jax.nn.relu(hk.Linear(5)(n)),
+      update_node_fn=hk.Linear(5, with_bias=False),
       add_self_edges=True)
   graph = gn(graph)
-
+  graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
   gn = jraph.GraphConvolution(
-      update_node_fn=hk.Linear(2))
+      update_node_fn=hk.Linear(2, with_bias=False))
   graph = gn(graph)
   return graph.nodes
 
