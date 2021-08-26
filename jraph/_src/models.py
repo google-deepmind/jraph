@@ -82,10 +82,10 @@ def GraphNetwork(
     update_edge_fn: Optional[GNUpdateEdgeFn],
     update_node_fn: Optional[GNUpdateNodeFn],
     update_global_fn: Optional[GNUpdateGlobalFn] = None,
-    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
-    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = jax.ops
+    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = utils.segment_sum,
+    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = utils
     .segment_sum,
-    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = jax.ops
+    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = utils
     .segment_sum,
     attention_logit_fn: Optional[AttentionLogitFn] = None,
     attention_normalize_fn: Optional[AttentionNormalizeFn] = utils
@@ -246,7 +246,7 @@ InteractionUpdateEdgeFn = Callable[
 def InteractionNetwork(
     update_edge_fn: InteractionUpdateEdgeFn,
     update_node_fn: InteractionUpdateNodeFn,
-    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
+    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = utils.segment_sum,
     include_sent_messages_in_node_update: bool = False):
   """Returns a method that applies a configured InteractionNetwork.
 
@@ -329,14 +329,14 @@ def RelationNetwork(
     update_edge_fn: Callable[[SenderFeatures, ReceiverFeatures], EdgeFeatures],
     update_global_fn: Callable[[EdgeFeatures], NodeFeatures],
     aggregate_edges_for_globals_fn:
-        AggregateEdgesToGlobalsFn = jax.ops.segment_sum):
+        AggregateEdgesToGlobalsFn = utils.segment_sum):
   """Returns a method that applies a Relation Network.
 
   See https://arxiv.org/abs/1706.01427 for more details.
 
   This implementation has one more argument, `aggregate_edges_for_globals_fn`,
   which changes how edge features are aggregated. The paper uses the default -
-  `jax.ops.segment_sum`.
+  `utils.segment_sum`.
 
   Args:
     update_edge_fn: function used to update the edges.
@@ -356,7 +356,7 @@ def DeepSets(
     update_node_fn: Callable[[NodeFeatures, Globals], NodeFeatures],
     update_global_fn: Callable[[NodeFeatures], Globals],
     aggregate_nodes_for_globals_fn:
-        AggregateNodesToGlobalsFn = jax.ops.segment_sum):
+        AggregateNodesToGlobalsFn = utils.segment_sum):
   """Returns a method that applies a DeepSets layer.
 
   Implementation for the model described in https://arxiv.org/abs/1703.06114
@@ -391,10 +391,10 @@ def GraphNetGAT(
     attention_logit_fn: AttentionLogitFn,
     attention_reduce_fn: AttentionReduceFn,
     update_global_fn: Optional[GNUpdateGlobalFn] = None,
-    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
-    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = jax.ops.
+    aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = utils.segment_sum,
+    aggregate_nodes_for_globals_fn: AggregateNodesToGlobalsFn = utils.
     segment_sum,
-    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = jax.ops.
+    aggregate_edges_for_globals_fn: AggregateEdgesToGlobalsFn = utils.
     segment_sum
     ):
   """Returns a method that applies a GraphNet with attention on edge features.
@@ -492,7 +492,7 @@ def GAT(attention_query_fn: GATAttentionQueryFn,
     # Apply weights
     messages = sent_attributes * weights
     # Aggregate messages to nodes.
-    nodes = jax.ops.segment_sum(messages, receivers, num_segments=sum_n_node)
+    nodes = utils.segment_sum(messages, receivers, num_segments=sum_n_node)
 
     # Apply an update function to the aggregated messages.
     nodes = node_update_fn(nodes)
@@ -503,7 +503,7 @@ def GAT(attention_query_fn: GATAttentionQueryFn,
 
 def GraphConvolution(
     update_node_fn: Callable[[NodeFeatures], NodeFeatures],
-    aggregate_nodes_fn: AggregateEdgesToNodesFn = jax.ops.segment_sum,
+    aggregate_nodes_fn: AggregateEdgesToNodesFn = utils.segment_sum,
     add_self_edges: bool = False,
     symmetric_normalization: bool = True):
   """Returns a method that applies a Graph Convolution layer.
@@ -551,7 +551,7 @@ def GraphConvolution(
     # pylint: disable=g-long-lambda
     if symmetric_normalization:
       # Calculate the normalization values.
-      count_edges = lambda x: jax.ops.segment_sum(
+      count_edges = lambda x: utils.segment_sum(
           jnp.ones_like(conv_senders), x, total_num_nodes)
       sender_degree = count_edges(conv_senders)
       receiver_degree = count_edges(conv_receivers)

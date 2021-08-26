@@ -60,6 +60,7 @@ from jraph._src.utils import segment_mean
 from jraph._src.utils import segment_min
 from jraph._src.utils import segment_normalize
 from jraph._src.utils import segment_softmax
+from jraph._src.utils import segment_sum
 from jraph._src.utils import segment_variance
 from jraph._src.utils import unbatch
 from jraph._src.utils import unbatch_np
@@ -85,7 +86,7 @@ __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "get_number_of_padding_with_graphs_edges", "unpad_with_graphs",
            "get_node_padding_mask", "get_edge_padding_mask",
            "get_graph_padding_mask", "segment_max", "segment_softmax",
-           "partition_softmax", "concatenated_args",
+           "segment_sum", "partition_softmax", "concatenated_args",
            "get_fully_connected_graph", "dynamically_batch",
            "with_zero_out_padding_outputs", "zero_out_padding")
 

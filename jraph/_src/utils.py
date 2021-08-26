@@ -1,6 +1,5 @@
 # Copyright 2020 DeepMind Technologies Limited.
 
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -24,55 +23,138 @@ import jax.tree_util as tree
 from jraph._src import graph as gn_graph
 import numpy as np
 
-
 # As of 04/2020 pytype doesn't support recursive types.
 # pytype: disable=not-supported-yet
 ArrayTree = Union[jnp.ndarray, Iterable['ArrayTree'], Mapping[Any, 'ArrayTree']]
 
 
-# Defines segment_sum for the convenience of the user.
-segment_sum = jax.ops.segment_sum
+def segment_sum(data: jnp.ndarray,
+                segment_ids: jnp.ndarray,
+                num_segments: Optional[int] = None,
+                indices_are_sorted: bool = False,
+                unique_indices: bool = False):
+  """Computes the sum within segments of an array.
+
+  Jraph alias to `jax.ops.segment_sum
+  <https://jax.readthedocs.io/en/latest/_autosummary/jax.ops.segment_sum.html>`_.
+  Note that other segment operations in jraph are not aliases, but are rather
+  defined inside the package. Similar to TensorFlow's `segment_sum
+  <https://www.tensorflow.org/api_docs/python/tf/math/segment_sum>`_.
+
+  Args:
+    data: an array with the values to be summed.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be summed. Values can be repeated and
+      need not be sorted. Values outside of the range [0, num_segments) are
+      dropped and do not contribute to the sum.
+    num_segments: optional, an int with nonnegative value indicating the number
+      of segments. The default is set to be the minimum number of segments that
+      would support all indices in ``segment_ids``, calculated as
+      ``max(segment_ids) + 1``. Since `num_segments` determines the size of the
+      output, a static value must be provided to use ``segment_sum`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted.
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates.
+
+  Returns:
+    An array with shape :code:`(num_segments,) + data.shape[1:]` representing
+    the segment sums.
+
+  Examples:
+    Simple 1D segment sum:
+
+    >>> data = jnp.arange(5)
+    >>> segment_ids = jnp.array([0, 0, 1, 1, 2])
+    >>> segment_sum(data, segment_ids)
+    DeviceArray([1, 5, 4], dtype=int32)
+
+    Using JIT requires static `num_segments`:
+
+    >>> from jax import jit
+    >>> jit(segment_sum, static_argnums=2)(data, segment_ids, 3)
+    DeviceArray([1, 5, 4], dtype=int32)
+  """
+  return jax.ops.segment_sum(
+      data=data,
+      segment_ids=segment_ids,
+      num_segments=num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)
 
 
-# Defines a sorted segment_sum for the convenience of the user. A sorted segment
-# sum provide additional optimizations over unsorted segment_sum on some
-# backends. Improvements can be noticed especially for large sums on TPUs.
-sorted_segment_sum = functools.partial(segment_sum, indices_are_sorted=True)
-
-
-def segment_mean(data, segment_ids, num_segments):
+def segment_mean(data: jnp.ndarray,
+                 segment_ids: jnp.ndarray,
+                 num_segments: Optional[int] = None,
+                 indices_are_sorted: bool = False,
+                 unique_indices: bool = False):
   """Returns mean for each segment.
 
   Args:
     data: the values which are averaged segment-wise.
     segment_ids: indices for the segments.
     num_segments: total number of segments.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted.
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates.
   """
-  nominator = jax.ops.segment_sum(data, segment_ids, num_segments)
-  denominator = jax.ops.segment_sum(
-      jnp.ones_like(data), segment_ids, num_segments)
+  nominator = segment_sum(
+      data,
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)
+  denominator = segment_sum(
+      jnp.ones_like(data),
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)
   return jnp.nan_to_num(nominator / denominator)
 
 
-def segment_variance(data, segment_ids, num_segments):
+def segment_variance(data: jnp.ndarray,
+                     segment_ids: jnp.ndarray,
+                     num_segments: Optional[int] = None,
+                     indices_are_sorted: bool = False,
+                     unique_indices: bool = False):
   """Returns the variance for each segment.
 
   Args:
     data: values whose variance will be calculated segment-wise.
     segment_ids: indices for segments
     num_segments: total number of segments.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted.
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates.
 
   Returns:
     num_segments size array containing the variance of each segment.
   """
-  means = segment_mean(data, segment_ids, num_segments)[segment_ids]
-  counts = jax.ops.segment_sum(jnp.ones_like(data), segment_ids, num_segments)
-  variances = jax.ops.segment_sum(jnp.power(data - means, 2),
-                                  segment_ids, num_segments) / counts
+  means = segment_mean(
+      data,
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)[segment_ids]
+  counts = segment_sum(
+      jnp.ones_like(data),
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)
+  variances = segment_sum(
+      jnp.power(data - means, 2),
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices) / counts
   return jnp.nan_to_num(variances)
 
 
-def segment_normalize(data, segment_ids, num_segments, eps=1e-5):
+def segment_normalize(data: jnp.ndarray,
+                      segment_ids: jnp.ndarray,
+                      num_segments: Optional[int] = None,
+                      indices_are_sorted: bool = False,
+                      unique_indices: bool = False,
+                      eps=1e-5):
   """Normalizes data within each segment.
 
   Args:
@@ -80,13 +162,26 @@ def segment_normalize(data, segment_ids, num_segments, eps=1e-5):
       segment-wise.
     segment_ids: indices for segments.
     num_segments: total number of segments.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted.
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates.
     eps: epsilon for numerical stability.
 
   Returns:
     array containing data normalized segment-wise.
   """
-  means = segment_mean(data, segment_ids, num_segments)[segment_ids]
-  variances = segment_variance(data, segment_ids, num_segments)[segment_ids]
+
+  means = segment_mean(
+      data,
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)[segment_ids]
+  variances = segment_variance(
+      data,
+      segment_ids,
+      num_segments,
+      indices_are_sorted=indices_are_sorted,
+      unique_indices=unique_indices)[segment_ids]
   normalized = (data - means) * lax.rsqrt(variances + eps)
   return jnp.nan_to_num(normalized)
 
@@ -191,8 +286,7 @@ def unbatch_np(graph: gn_graph.GraphsTuple) -> List[gn_graph.GraphsTuple]:
   return _unbatch(graph, np_=np)
 
 
-def _unbatch(
-    graph: gn_graph.GraphsTuple, np_) -> List[gn_graph.GraphsTuple]:
+def _unbatch(graph: gn_graph.GraphsTuple, np_) -> List[gn_graph.GraphsTuple]:
   """Returns a list of graphs given a batched graph."""
 
   def _map_split(nest, indices_or_sections):
@@ -204,8 +298,10 @@ def _unbatch(
     concat = lambda field: np_.split(field, indices_or_sections)
     nest_of_lists = tree.tree_map(concat, nest)
     # pylint: disable=cell-var-from-loop
-    list_of_nests = [tree.tree_multimap(lambda _, x: x[i], nest, nest_of_lists)
-                     for i in range(n_lists)]
+    list_of_nests = [
+        tree.tree_multimap(lambda _, x: x[i], nest, nest_of_lists)
+        for i in range(n_lists)
+    ]
     return list_of_nests
 
   all_n_node = graph.n_node[:, None]
@@ -225,9 +321,11 @@ def _unbatch(
     all_senders[graph_index] -= node_offsets[graph_index - 1]
     all_receivers[graph_index] -= node_offsets[graph_index - 1]
 
-  return [gn_graph.GraphsTuple._make(elements)
-          for elements in zip(all_nodes, all_edges, all_receivers, all_senders,
-                              all_globals, all_n_node, all_n_edge)]
+  return [
+      gn_graph.GraphsTuple._make(elements)
+      for elements in zip(all_nodes, all_edges, all_receivers, all_senders,
+                          all_globals, all_n_node, all_n_edge)
+  ]
 
 
 def pad_with_graphs(graph: gn_graph.GraphsTuple,
@@ -286,10 +384,12 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
       lambda leaf: np.zeros((pad_n_graph,) + leaf.shape[1:], dtype=leaf.dtype))
 
   padding_graph = gn_graph.GraphsTuple(
-      n_node=np.concatenate([np.array([pad_n_node]),
-                             np.zeros(pad_n_empty_graph, dtype=np.int32)]),
-      n_edge=np.concatenate([np.array([pad_n_edge]),
-                             np.zeros(pad_n_empty_graph, dtype=np.int32)]),
+      n_node=np.concatenate(
+          [np.array([pad_n_node]),
+           np.zeros(pad_n_empty_graph, dtype=np.int32)]),
+      n_edge=np.concatenate(
+          [np.array([pad_n_edge]),
+           np.zeros(pad_n_empty_graph, dtype=np.int32)]),
       nodes=tree.tree_map(tree_nodes_pad, graph.nodes),
       edges=tree.tree_map(tree_edges_pad, graph.edges),
       globals=tree.tree_map(tree_globs_pad, graph.globals),
@@ -367,8 +467,7 @@ def unpad_with_graphs(
   is data-dependent!
 
   Args:
-    padded_graph: ``GraphsTuple`` padded with a dummy graph
-      and empty graphs.
+    padded_graph: ``GraphsTuple`` padded with a dummy graph and empty graphs.
 
   Returns:
     The unpadded graph.
@@ -394,10 +493,10 @@ def get_node_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
   """Returns a mask for the nodes of a padded graph.
 
   Args:
-    padded_graph: ``GraphsTuple`` padded using ``pad_with_graphs``. This
-        graph must contain at least one array of node features so the total
-        static number of nodes can be inferred statically from the shape, and
-        the method can be jitted.
+    padded_graph: ``GraphsTuple`` padded using ``pad_with_graphs``. This graph
+      must contain at least one array of node features so the total static
+      number of nodes can be inferred statically from the shape, and the method
+      can be jitted.
 
   Returns:
     Boolean array of shape [total_num_nodes] containing True for real nodes,
@@ -449,9 +548,11 @@ def _get_mask(padding_length, full_length):
 
 
 def concatenated_args(
-    update: Optional[Callable[..., ArrayTree]] = None, *,
-    axis: int = -1) -> Union[Callable[..., ArrayTree],
-                             Callable[[Callable[..., ArrayTree]], ArrayTree]]:
+    update: Optional[Callable[..., ArrayTree]] = None,
+    *,
+    axis: int = -1
+) -> Union[Callable[..., ArrayTree], Callable[[Callable[..., ArrayTree]],
+                                              ArrayTree]]:
   """Decorator that concatenates arguments before being passed to an update_fn.
 
   By default node, edge and global features are passed separately to update
@@ -477,12 +578,15 @@ def concatenated_args(
   Returns:
     A wrapped function with the arguments concatenated.
   """
+
   def _decorate(f):
+
     @functools.wraps(update)
     def wrapper(*args, **kwargs):
       combined_args = tree.tree_flatten(args)[0] + tree.tree_flatten(kwargs)[0]
       concat_args = jnp.concatenate(combined_args, axis=axis)
       return f(concat_args)
+
     return wrapper
 
   # If the update function is passed, then decorate the update function.
@@ -515,8 +619,11 @@ def dtype_min_value(dtype):
     raise ValueError(f'Invalid data type {dtype.kind!r}.')
 
 
-def segment_max(data, segment_ids, num_segments=None,
-                indices_are_sorted=False, unique_indices=False):
+def segment_max(data: jnp.ndarray,
+                segment_ids: jnp.ndarray,
+                num_segments: Optional[int] = None,
+                indices_are_sorted: bool = False,
+                unique_indices: bool = False):
   """Computes the max within segments of an array.
 
   Similar to TensorFlow's segment_max:
@@ -547,12 +654,15 @@ def segment_max(data, segment_ids, num_segments=None,
   min_value = dtype_min_value(data.dtype)
   out = jnp.full((num_segments,) + data.shape[1:], min_value, dtype=data.dtype)
   segment_ids = jnp.mod(segment_ids, num_segments)
-  return jax.ops.index_max(
-      out, segment_ids, data, indices_are_sorted, unique_indices)
+  return jax.ops.index_max(out, segment_ids, data, indices_are_sorted,
+                           unique_indices)
 
 
-def segment_min(data, segment_ids, num_segments=None,
-                indices_are_sorted=False, unique_indices=False):
+def segment_min(data: jnp.ndarray,
+                segment_ids: jnp.ndarray,
+                num_segments: Optional[int] = None,
+                indices_are_sorted: bool = False,
+                unique_indices: bool = False):
   """Computes the min within segments of an array.
 
   Similar to TensorFlow's segment_min:
@@ -583,11 +693,12 @@ def segment_min(data, segment_ids, num_segments=None,
   max_value = dtype_max_value(data.dtype)
   out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
   segment_ids = jnp.mod(segment_ids, num_segments)
-  return jax.ops.index_min(
-      out, segment_ids, data, indices_are_sorted, unique_indices)
+  return jax.ops.index_min(out, segment_ids, data, indices_are_sorted,
+                           unique_indices)
 
 
-def segment_softmax(logits: jnp.ndarray, segment_ids: jnp.ndarray,
+def segment_softmax(logits: jnp.ndarray,
+                    segment_ids: jnp.ndarray,
                     num_segments: Optional[int] = None,
                     indices_are_sorted: bool = False,
                     unique_indices: bool = False) -> ArrayTree:
@@ -626,13 +737,14 @@ def segment_softmax(logits: jnp.ndarray, segment_ids: jnp.ndarray,
   # Then take the exp
   logits = jnp.exp(logits)
   # Then calculate the normalizers
-  normalizers = jax.ops.segment_sum(logits, segment_ids, num_segments,
-                                    indices_are_sorted, unique_indices)
+  normalizers = segment_sum(logits, segment_ids, num_segments,
+                            indices_are_sorted, unique_indices)
   softmax = logits / normalizers[segment_ids]
   return jnp.nan_to_num(softmax)
 
 
-def partition_softmax(logits: ArrayTree, partitions: jnp.ndarray,
+def partition_softmax(logits: ArrayTree,
+                      partitions: jnp.ndarray,
                       sum_partitions: Optional[int] = None):
   """Compute a softmax within partitions of an array.
 
@@ -656,10 +768,13 @@ def partition_softmax(logits: ArrayTree, partitions: jnp.ndarray,
     The softmax over nodes by graph.
   """
   n_partitions = len(partitions)
-  segment_ids = jnp.repeat(jnp.arange(n_partitions), partitions, axis=0,
-                           total_repeat_length=sum_partitions)
-  return segment_softmax(logits, segment_ids, n_partitions,
-                         indices_are_sorted=True)
+  segment_ids = jnp.repeat(
+      jnp.arange(n_partitions),
+      partitions,
+      axis=0,
+      total_repeat_length=sum_partitions)
+  return segment_softmax(
+      logits, segment_ids, n_partitions, indices_are_sorted=True)
 
 
 def get_fully_connected_graph(n_node_per_graph: int,
@@ -695,8 +810,8 @@ def get_fully_connected_graph(n_node_per_graph: int,
   tmp_senders, tmp_receivers = jnp.meshgrid(
       jnp.arange(n_node_per_graph), jnp.arange(n_node_per_graph))
   if not add_self_edges:
-    tmp_senders = jax.vmap(jnp.roll)(
-        tmp_senders, -jnp.arange(len(tmp_senders)))[:, 1:]
+    tmp_senders = jax.vmap(jnp.roll)(tmp_senders,
+                                     -jnp.arange(len(tmp_senders)))[:, 1:]
     tmp_receivers = tmp_receivers[:, 1:]
   # Flatten the senders and receivers.
   tmp_senders = tmp_senders.flatten()
@@ -712,15 +827,17 @@ def get_fully_connected_graph(n_node_per_graph: int,
       return jnp.concatenate(indices_list, axis=0)
     else:
       return jnp.array([], dtype=tmp_senders.dtype)
+
   return gn_graph.GraphsTuple(
       nodes=node_features,
       edges=None,
-      n_node=jnp.array([n_node_per_graph]*n_graph),
+      n_node=jnp.array([n_node_per_graph] * n_graph),
       n_edge=jnp.array(n_edge) if n_edge else jnp.array([0]),
       senders=_concat_or_empty_indices(senders),
       receivers=_concat_or_empty_indices(receivers),
       globals=global_features,
   )
+
 
 _NUMBER_FIELDS = ('n_node', 'n_edge', 'n_graph')
 
@@ -814,8 +931,8 @@ def dynamically_batch(
     yield pad_with_graphs(batched_graph, n_node, n_edge, n_graph)
 
 
-def _expand_trailing_dimensions(
-    array: jnp.ndarray, template: jnp.ndarray) -> jnp.ndarray:
+def _expand_trailing_dimensions(array: jnp.ndarray,
+                                template: jnp.ndarray) -> jnp.ndarray:
   missing_dims = len(template.shape) - len(array.shape)
   out = jnp.reshape(array, array.shape + (1,) * missing_dims)
   assert out.dtype == array.dtype
@@ -913,7 +1030,9 @@ def with_zero_out_padding_outputs(
   Returns:
     A Graph Neural Network that will zero out all output padded values.
   """
+
   @functools.wraps(graph_net)
   def wrapper(graph: gn_graph.GraphsTuple) -> gn_graph.GraphsTuple:
     return zero_out_padding(graph_net(graph))
+
   return wrapper

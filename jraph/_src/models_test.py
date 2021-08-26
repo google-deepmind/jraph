@@ -23,6 +23,7 @@ import jax.tree_util as tree
 
 from jraph._src import graph
 from jraph._src import models
+from jraph._src import utils
 import numpy as np
 
 
@@ -162,7 +163,7 @@ def _get_interaction_network(graphs_tuple):
   nodes, edges, receivers, senders, _, _, _ = graphs_tuple
   expected_edges = jnp.concatenate(
       (edges, nodes[senders], nodes[receivers]), axis=-1)
-  aggregated_nodes = jax.ops.segment_sum(
+  aggregated_nodes = utils.segment_sum(
       expected_edges, receivers, num_segments=len(graphs_tuple.nodes))
   expected_nodes = jnp.concatenate(
       (nodes, aggregated_nodes), axis=-1)
@@ -191,7 +192,7 @@ def _get_relation_network(graphs_tuple):
   edge_gr_idx = jnp.repeat(jnp.arange(num_graphs),
                            graphs_tuple.n_edge,
                            total_repeat_length=graphs_tuple.edges.shape[0])
-  aggregated_edges = jax.ops.segment_sum(
+  aggregated_edges = utils.segment_sum(
       expected_edges, edge_gr_idx, num_segments=num_graphs)
   expected_out = graphs_tuple._replace(
       edges=expected_edges, globals=aggregated_edges*2)
@@ -213,7 +214,7 @@ def _get_deep_sets(graphs_tuple):
                            total_repeat_length=num_nodes)
   expected_out = graphs_tuple._replace(
       nodes=expected_nodes,
-      globals=jax.ops.segment_sum(
+      globals=utils.segment_sum(
           expected_nodes, node_gr_idx, num_segments=num_graphs)*2)
   return out, expected_out
 

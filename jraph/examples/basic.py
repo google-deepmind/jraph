@@ -162,9 +162,9 @@ def run():
 
   # Optionally define custom aggregation functions.
   # In this example we use the defaults (so no need to define them explicitly).
-  aggregate_edges_for_nodes_fn = jax.ops.segment_sum
-  aggregate_nodes_for_globals_fn = jax.ops.segment_sum
-  aggregate_edges_for_globals_fn = jax.ops.segment_sum
+  aggregate_edges_for_nodes_fn = jraph.segment_sum
+  aggregate_nodes_for_globals_fn = jraph.segment_sum
+  aggregate_edges_for_globals_fn = jraph.segment_sum
 
   # Optionally define attention logit function and attention reduce function.
   # This can be used for graph attention.

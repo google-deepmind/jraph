@@ -365,6 +365,12 @@ class GraphTest(test_util.JaxTestCase):
     self.assertAllClose(result, jnp.array([16, 14, 2, 0, 4, 0]),
                         check_dtypes=False)
 
+  def test_segment_sum_optional_num_segments(self):
+    result = utils.segment_sum(
+        jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]))
+    self.assertAllClose(
+        result, jnp.array([16, 14, 2, 0, 4]), check_dtypes=False)
+
   def test_segment_mean(self):
     result = utils.segment_mean(
         jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
