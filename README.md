@@ -11,7 +11,9 @@ models.
 
 ## Installation
 
-Jraph can be installed directly from github using the following command:
+```pip install jraph```
+
+Or Jraph can be installed directly from github using the following command:
 
 ```pip install git+git://github.com/deepmind/jraph.git```
 
