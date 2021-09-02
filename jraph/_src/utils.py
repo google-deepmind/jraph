@@ -186,6 +186,154 @@ def segment_normalize(data: jnp.ndarray,
   return jnp.nan_to_num(normalized)
 
 
+def segment_max(data: jnp.ndarray,
+                segment_ids: jnp.ndarray,
+                num_segments: Optional[int] = None,
+                indices_are_sorted: bool = False,
+                unique_indices: bool = False):
+  """Alias for jax.ops.segment_max.
+
+  Args:
+    data: an array with the values to be maxed over.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be maxed over. Values can be repeated
+      and need not be sorted. Values outside of the range [0, num_segments) are
+      wrapped into that range by applying jnp.mod.
+    num_segments: optional, an int with positive value indicating the number of
+      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
+      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
+      the output, a static value must be provided to use ``segment_max`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
+
+  Returns:
+    An array with shape ``(num_segments,) + data.shape[1:]`` representing
+    the segment maxs.
+  """
+  return jax.ops.segment_max(data, segment_ids, num_segments,
+                             indices_are_sorted, unique_indices)
+
+
+def segment_min(data: jnp.ndarray,
+                segment_ids: jnp.ndarray,
+                num_segments: Optional[int] = None,
+                indices_are_sorted: bool = False,
+                unique_indices: bool = False):
+  """Computes the min within segments of an array.
+
+  Similar to TensorFlow's segment_min:
+  https://www.tensorflow.org/api_docs/python/tf/math/segment_min
+
+  Args:
+    data: an array with the values to be maxed over.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be min'd over. Values can be repeated
+      and need not be sorted. Values outside of the range [0, num_segments) are
+      wrapped into that range by applying jnp.mod.
+    num_segments: optional, an int with positive value indicating the number of
+      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
+      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
+      the output, a static value must be provided to use ``segment_max`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
+
+  Returns:
+    An array with shape ``(num_segments,) + data.shape[1:]`` representing
+    the segment mins.
+  """
+  if num_segments is None:
+    num_segments = jnp.maximum(jnp.max(segment_ids) + 1, jnp.max(-segment_ids))
+  num_segments = int(num_segments)
+
+  max_value = dtype_max_value(data.dtype)
+  out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
+  segment_ids = jnp.mod(segment_ids, num_segments)
+  return jax.ops.index_min(out, segment_ids, data, indices_are_sorted,
+                           unique_indices)
+
+
+def segment_softmax(logits: jnp.ndarray,
+                    segment_ids: jnp.ndarray,
+                    num_segments: Optional[int] = None,
+                    indices_are_sorted: bool = False,
+                    unique_indices: bool = False) -> ArrayTree:
+  """Computes a segment-wise softmax.
+
+  For a given tree of logits that can be divded into segments, computes a
+  softmax over the segments.
+
+    logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
+    segment_ids = jnp.ndarray([0, 0, 0, 1, 1])
+    segment_softmax(logits, segments)
+    >> DeviceArray([0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
+    >> dtype=float32)
+
+  Args:
+    logits: an array of logits to be segment softmaxed.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be maxed over. Values can be repeated
+      and need not be sorted. Values outside of the range [0, num_segments) are
+      wrapped into that range by applying jnp.mod.
+    num_segments: optional, an int with positive value indicating the number of
+      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
+      jnp.max(-segment_ids))`` but since ``num_segments`` determines the size of
+      the output, a static value must be provided to use ``segment_sum`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
+
+  Returns:
+    The segment softmax-ed ``logits``.
+  """
+  # First, subtract the segment max for numerical stability
+  maxs = segment_max(logits, segment_ids, num_segments, indices_are_sorted,
+                     unique_indices)
+  logits = logits - maxs[segment_ids]
+  # Then take the exp
+  logits = jnp.exp(logits)
+  # Then calculate the normalizers
+  normalizers = segment_sum(logits, segment_ids, num_segments,
+                            indices_are_sorted, unique_indices)
+  softmax = logits / normalizers[segment_ids]
+  return jnp.nan_to_num(softmax)
+
+
+def partition_softmax(logits: ArrayTree,
+                      partitions: jnp.ndarray,
+                      sum_partitions: Optional[int] = None):
+  """Compute a softmax within partitions of an array.
+
+    For example::
+      logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
+      partitions = jnp.ndarray([3, 2])
+      partition_softmax(node_logits, n_node)
+      >> DeviceArray(
+      >> [0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
+      >> dtype=float32)
+
+  Args:
+    logits: the logits for the softmax.
+    partitions: the number of nodes per graph. It is a vector of integers with
+      shape ``[n_graphs]``, such that ``graph.n_node[i]`` is the number of nodes
+      in the i-th graph.
+    sum_partitions: the sum of n_node. If not passed, the result of this method
+      is data dependent and so not ``jit``-able.
+
+  Returns:
+    The softmax over partitions.
+  """
+  n_partitions = len(partitions)
+  segment_ids = jnp.repeat(
+      jnp.arange(n_partitions),
+      partitions,
+      axis=0,
+      total_repeat_length=sum_partitions)
+  return segment_softmax(
+      logits, segment_ids, n_partitions, indices_are_sorted=True)
+
+
 def batch(graphs: Sequence[gn_graph.GraphsTuple]) -> gn_graph.GraphsTuple:
   """Returns a batched graph given a list of graphs.
 
@@ -617,164 +765,6 @@ def dtype_min_value(dtype):
     return False
   else:
     raise ValueError(f'Invalid data type {dtype.kind!r}.')
-
-
-def segment_max(data: jnp.ndarray,
-                segment_ids: jnp.ndarray,
-                num_segments: Optional[int] = None,
-                indices_are_sorted: bool = False,
-                unique_indices: bool = False):
-  """Computes the max within segments of an array.
-
-  Similar to TensorFlow's segment_max:
-  https://www.tensorflow.org/api_docs/python/tf/math/segment_max
-
-  Args:
-    data: an array with the values to be maxed over.
-    segment_ids: an array with integer dtype that indicates the segments of
-      `data` (along its leading axis) to be maxed over. Values can be repeated
-      and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
-    num_segments: optional, an int with positive value indicating the number of
-      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
-      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
-      the output, a static value must be provided to use ``segment_max`` in a
-      ``jit``-compiled function.
-    indices_are_sorted: whether ``segment_ids`` is known to be sorted
-    unique_indices: whether ``segment_ids`` is known to be free of duplicates
-
-  Returns:
-    An array with shape ``(num_segments,) + data.shape[1:]`` representing
-    the segment maxs.
-  """
-  if num_segments is None:
-    num_segments = jnp.maximum(jnp.max(segment_ids) + 1, jnp.max(-segment_ids))
-  num_segments = int(num_segments)
-
-  min_value = dtype_min_value(data.dtype)
-  out = jnp.full((num_segments,) + data.shape[1:], min_value, dtype=data.dtype)
-  segment_ids = jnp.mod(segment_ids, num_segments)
-  return jax.ops.index_max(out, segment_ids, data, indices_are_sorted,
-                           unique_indices)
-
-
-def segment_min(data: jnp.ndarray,
-                segment_ids: jnp.ndarray,
-                num_segments: Optional[int] = None,
-                indices_are_sorted: bool = False,
-                unique_indices: bool = False):
-  """Computes the min within segments of an array.
-
-  Similar to TensorFlow's segment_min:
-  https://www.tensorflow.org/api_docs/python/tf/math/segment_min
-
-  Args:
-    data: an array with the values to be maxed over.
-    segment_ids: an array with integer dtype that indicates the segments of
-      `data` (along its leading axis) to be min'd over. Values can be repeated
-      and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
-    num_segments: optional, an int with positive value indicating the number of
-      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
-      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
-      the output, a static value must be provided to use ``segment_max`` in a
-      ``jit``-compiled function.
-    indices_are_sorted: whether ``segment_ids`` is known to be sorted
-    unique_indices: whether ``segment_ids`` is known to be free of duplicates
-
-  Returns:
-    An array with shape ``(num_segments,) + data.shape[1:]`` representing
-    the segment mins.
-  """
-  if num_segments is None:
-    num_segments = jnp.maximum(jnp.max(segment_ids) + 1, jnp.max(-segment_ids))
-  num_segments = int(num_segments)
-
-  max_value = dtype_max_value(data.dtype)
-  out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
-  segment_ids = jnp.mod(segment_ids, num_segments)
-  return jax.ops.index_min(out, segment_ids, data, indices_are_sorted,
-                           unique_indices)
-
-
-def segment_softmax(logits: jnp.ndarray,
-                    segment_ids: jnp.ndarray,
-                    num_segments: Optional[int] = None,
-                    indices_are_sorted: bool = False,
-                    unique_indices: bool = False) -> ArrayTree:
-  """Computes a segment-wise softmax.
-
-  For a given tree of logits that can be divded into segments, computes a
-  softmax over the segments.
-
-    logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
-    segment_ids = jnp.ndarray([0, 0, 0, 1, 1])
-    segment_softmax(logits, segments)
-    >> DeviceArray([0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
-    >> dtype=float32)
-
-  Args:
-    logits: an array of logits to be segment softmaxed.
-    segment_ids: an array with integer dtype that indicates the segments of
-      `data` (along its leading axis) to be maxed over. Values can be repeated
-      and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
-    num_segments: optional, an int with positive value indicating the number of
-      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
-      jnp.max(-segment_ids))`` but since ``num_segments`` determines the size of
-      the output, a static value must be provided to use ``segment_sum`` in a
-      ``jit``-compiled function.
-    indices_are_sorted: whether ``segment_ids`` is known to be sorted
-    unique_indices: whether ``segment_ids`` is known to be free of duplicates
-
-  Returns:
-    The segment softmax-ed ``logits``.
-  """
-  # First, subtract the segment max for numerical stability
-  maxs = segment_max(logits, segment_ids, num_segments, indices_are_sorted,
-                     unique_indices)
-  logits = logits - maxs[segment_ids]
-  # Then take the exp
-  logits = jnp.exp(logits)
-  # Then calculate the normalizers
-  normalizers = segment_sum(logits, segment_ids, num_segments,
-                            indices_are_sorted, unique_indices)
-  softmax = logits / normalizers[segment_ids]
-  return jnp.nan_to_num(softmax)
-
-
-def partition_softmax(logits: ArrayTree,
-                      partitions: jnp.ndarray,
-                      sum_partitions: Optional[int] = None):
-  """Compute a softmax within partitions of an array.
-
-    For example::
-      logits = jnp.ndarray([1.0, 2.0, 3.0, 1.0, 2.0])
-      partitions = jnp.ndarray([3, 2])
-      partition_softmax(node_logits, n_node)
-      >> DeviceArray(
-      >> [0.09003057, 0.24472848, 0.66524094, 0.26894142, 0.7310586],
-      >> dtype=float32)
-
-  Args:
-    logits: the logits for the softmax.
-    partitions: the number of nodes per graph. It is a vector of integers with
-      shape ``[n_graphs]``, such that ``graph.n_node[i]`` is the number of nodes
-      in the i-th graph.
-    sum_partitions: the sum of n_node. If not passed, the result of this method
-      is data dependent and so not ``jit``-able.
-
-  Returns:
-    The softmax over nodes by graph.
-  """
-  n_partitions = len(partitions)
-  segment_ids = jnp.repeat(
-      jnp.arange(n_partitions),
-      partitions,
-      axis=0,
-      total_repeat_length=sum_partitions)
-  return segment_softmax(
-      logits, segment_ids, n_partitions, indices_are_sorted=True)
 
 
 def get_fully_connected_graph(n_node_per_graph: int,
