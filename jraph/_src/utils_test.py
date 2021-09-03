@@ -433,6 +433,57 @@ class GraphTest(test_util.JaxTestCase):
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
       self.assertAllClose(result, expected_out, check_dtypes=True)
 
+  @parameterized.parameters((False, False), (True, False), (True, True),
+                            (False, True))
+  def test_segment_max_or_constant(self, indices_are_sorted, unique_indices):
+    if unique_indices:
+      data = jnp.arange(6, dtype=jnp.float32)
+      if indices_are_sorted:
+        segment_ids = jnp.array([0, 1, 2, 3, 4, 5])
+        expected_out = jnp.array([0, 1, 2, 3, 4, 5, 0], dtype=jnp.float32)
+        num_segments = 7
+      else:
+        segment_ids = jnp.array([1, 0, 2, 4, 3, -5])
+        expected_out = jnp.array([1, 0, 2, 4, 3], dtype=jnp.float32)
+        num_segments = 5
+    else:
+      data = jnp.arange(9, dtype=jnp.float32)
+      if indices_are_sorted:
+        segment_ids = jnp.array([0, 0, 0, 1, 1, 1, 2, 3, 4])
+        expected_out = jnp.array([2, 5, 6, 7, 8, 0], dtype=jnp.float32)
+      else:
+        segment_ids = jnp.array([0, 1, 2, 0, 4, 0, 1, 1, -6])
+        expected_out = jnp.array([5, 7, 2, 0, 4, 0], dtype=jnp.float32)
+      num_segments = 6
+
+    with self.subTest('nojit'):
+      result = utils.segment_max_or_constant(data, segment_ids, num_segments,
+                                             indices_are_sorted, unique_indices)
+      self.assertAllClose(result, expected_out, check_dtypes=True)
+      grad = jax.grad(lambda *x: jnp.sum(utils.segment_max_or_constant(*x)))(
+          data, segment_ids, num_segments, indices_are_sorted, unique_indices)
+      assert np.all(jnp.isfinite(grad))
+      result = utils.segment_max_or_constant(
+          data,
+          segment_ids,
+          indices_are_sorted=indices_are_sorted,
+          unique_indices=unique_indices)
+      num_unique_segments = jnp.max(segment_ids) + 1
+      self.assertAllClose(
+          result, expected_out[:num_unique_segments], check_dtypes=True)
+    with self.subTest('jit'):
+      result = jax.jit(
+          utils.segment_max_or_constant,
+          static_argnums=(2, 3, 4))(data, segment_ids, num_segments,
+                                    indices_are_sorted, unique_indices)
+      self.assertAllClose(result, expected_out, check_dtypes=True)
+      grad_fn = jax.jit(
+          jax.grad(lambda *x: jnp.sum(utils.segment_max_or_constant(*x))),
+          static_argnums=(2, 3, 4))
+      grad = grad_fn(data, segment_ids, num_segments, indices_are_sorted,
+                     unique_indices)
+      assert np.all(jnp.isfinite(grad))
+
   @parameterized.parameters((False, False),
                             (True, False),
                             (True, True),
