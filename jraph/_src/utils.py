@@ -1038,15 +1038,13 @@ def zero_out_padding(graph: gn_graph.GraphsTuple) -> gn_graph.GraphsTuple:
     A graph with the same valid values as input, but padded values zeroed out.
   """
   edge_mask = get_edge_padding_mask(graph)
-  edge_mask = jax.tree_map(_get_zero_fn(edge_mask), graph.edges)
+  masked_edges = jax.tree_map(_get_zero_fn(edge_mask), graph.edges)
   node_mask = get_node_padding_mask(graph)
-  node_mask = jax.tree_map(_get_zero_fn(node_mask), graph.nodes)
+  masked_nodes = jax.tree_map(_get_zero_fn(node_mask), graph.nodes)
   global_mask = get_graph_padding_mask(graph)
-  global_mask = jax.tree_map(_get_zero_fn(global_mask), graph.globals)
+  masked_globals = jax.tree_map(_get_zero_fn(global_mask), graph.globals)
   return graph._replace(
-      nodes=graph.nodes * node_mask,
-      edges=graph.edges * edge_mask,
-      globals=graph.globals * global_mask)
+      nodes=masked_nodes, edges=masked_edges, globals=masked_globals)
 
 
 def with_zero_out_padding_outputs(

@@ -828,9 +828,10 @@ class ZeroOutTest(test_util.JaxTestCase):
   def _assert_values_for_graph(self, padded_graph, wrapper):
     # Make padded graph values non zero.
     padded_graph = padded_graph._replace(
-        nodes=tree.tree_map(jnp.ones_like, padded_graph.nodes),
-        edges=tree.tree_map(jnp.ones_like, padded_graph.edges),
-        globals=tree.tree_map(jnp.ones_like, padded_graph.globals))
+        nodes=tree.tree_map(lambda x: x - 1., padded_graph.nodes),
+        edges=tree.tree_map(lambda x: x - 1., padded_graph.edges),
+        globals=tree.tree_map(lambda x: x - 1., padded_graph.globals))
+    true_valid_graph = utils.unbatch(padded_graph)[0]
     if wrapper:
       zeroed_graph_net = utils.with_zero_out_padding_outputs(lambda x: x)
       zeroed_padded_graph = zeroed_graph_net(padded_graph)
@@ -839,8 +840,8 @@ class ZeroOutTest(test_util.JaxTestCase):
     graphs = utils.unbatch(zeroed_padded_graph)
     valid_graph = graphs[0]
     padding_graphs = graphs[1:]
-    tree.tree_multimap(lambda x: self.assertArraysEqual(x, jnp.ones_like(x)),
-                       valid_graph.nodes)
+    tree.tree_multimap(self.assertArraysEqual,
+                       valid_graph.nodes, true_valid_graph.nodes)
     for padding_graph in padding_graphs:
       tree.tree_multimap(lambda x: self.assertArraysEqual(x, jnp.zeros_like(x)),
                          padding_graph.nodes)
