@@ -97,7 +97,7 @@ def GraphNetwork(
 
   There is one difference. For the nodes update the class aggregates over the
   sender edges and receiver edges separately. This is a bit more general
-  the algorithm described in the paper. The original behaviour can be
+  than the algorithm described in the paper. The original behaviour can be
   recovered by using only the receiver edge aggregations for the update.
 
   In addition this implementation supports softmax attention over incoming
@@ -119,7 +119,7 @@ def GraphNetwork(
     update_global_fn: function used to update the globals or None to deactivate
       globals updates.
     aggregate_edges_for_nodes_fn: function used to aggregate messages to each
-      nodes.
+      node.
     aggregate_nodes_for_globals_fn: function used to aggregate the nodes for the
       globals.
     aggregate_edges_for_globals_fn: function used to aggregate the edges for the
