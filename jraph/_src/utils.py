@@ -292,8 +292,7 @@ def segment_min(data: jnp.ndarray,
   max_value = dtype_max_value(data.dtype)
   out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
   segment_ids = jnp.mod(segment_ids, num_segments)
-  return jax.ops.index_min(out, segment_ids, data, indices_are_sorted,
-                           unique_indices)
+  return out.at[segment_ids].min(data, indices_are_sorted, unique_indices)
 
 
 def segment_softmax(logits: jnp.ndarray,
