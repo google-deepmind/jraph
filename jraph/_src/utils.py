@@ -198,7 +198,7 @@ def segment_max(data: jnp.ndarray,
     segment_ids: an array with integer dtype that indicates the segments of
       `data` (along its leading axis) to be maxed over. Values can be repeated
       and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
+      dropped and do not contribute to the result.
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
       jnp.max(-segment_ids))`` but since `num_segments` determines the size of
@@ -213,6 +213,57 @@ def segment_max(data: jnp.ndarray,
   """
   return jax.ops.segment_max(data, segment_ids, num_segments,
                              indices_are_sorted, unique_indices)
+
+
+def _replace_empty_segments_with_constant(aggregated_segments: jnp.ndarray,
+                                          segment_ids: jnp.ndarray,
+                                          num_segments: Optional[int] = None,
+                                          constant: float = 0.):
+  """Replaces the values of empty segments with constants."""
+  num_elements_in_segment = segment_sum(
+      jnp.ones((len(segment_ids),), dtype=jnp.int32),
+      segment_ids,
+      num_segments=num_segments)
+  return jnp.where(num_elements_in_segment > 0, aggregated_segments,
+                   jnp.array(constant, dtype=aggregated_segments.dtype))
+
+
+def segment_min_or_constant(data: jnp.ndarray,
+                            segment_ids: jnp.ndarray,
+                            num_segments: Optional[int] = None,
+                            indices_are_sorted: bool = False,
+                            unique_indices: bool = False,
+                            constant: float = 0.):
+  """As segment_min, but returns a constant for empty segments.
+
+  `segment_min` returns `-inf` for empty segments, which can cause `nan`s in the
+  backwards pass of a neural network, even with masking. This method overrides
+  the default behaviour of `segment_min` and returns a constant for empty
+  segments.
+
+  Args:
+    data: an array with the values to be maxed over.
+    segment_ids: an array with integer dtype that indicates the segments of
+      `data` (along its leading axis) to be maxed over. Values can be repeated
+      and need not be sorted. Values outside of the range [0, num_segments) are
+      dropped and do not contribute to the result.
+    num_segments: optional, an int with positive value indicating the number of
+      segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
+      jnp.max(-segment_ids))`` but since `num_segments` determines the size of
+      the output, a static value must be provided to use ``segment_min`` in a
+      ``jit``-compiled function.
+    indices_are_sorted: whether ``segment_ids`` is known to be sorted
+    unique_indices: whether ``segment_ids`` is known to be free of duplicates
+    constant: The constant to replace empty segments with, defaults to zero.
+
+  Returns:
+    An array with shape ``(num_segments,) + data.shape[1:]`` representing
+    the segment maxs.
+  """
+  mins_ = segment_min(data, segment_ids, num_segments, indices_are_sorted,
+                      unique_indices)
+  return _replace_empty_segments_with_constant(mins_, segment_ids, num_segments,
+                                               constant)
 
 
 def segment_max_or_constant(data: jnp.ndarray,
@@ -233,7 +284,7 @@ def segment_max_or_constant(data: jnp.ndarray,
     segment_ids: an array with integer dtype that indicates the segments of
       `data` (along its leading axis) to be maxed over. Values can be repeated
       and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
+      dropped and do not contribute to the result.
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
       jnp.max(-segment_ids))`` but since `num_segments` determines the size of
@@ -249,12 +300,8 @@ def segment_max_or_constant(data: jnp.ndarray,
   """
   maxs_ = segment_max(data, segment_ids, num_segments, indices_are_sorted,
                       unique_indices)
-  num_elements_in_segment = segment_sum(
-      jnp.ones(data.shape, dtype=jnp.int32),
-      segment_ids,
-      num_segments=num_segments)
-  return jnp.where(num_elements_in_segment > 0, maxs_,
-                   jnp.array(constant, dtype=maxs_.dtype))
+  return _replace_empty_segments_with_constant(maxs_, segment_ids, num_segments,
+                                               constant)
 
 
 def segment_min(data: jnp.ndarray,
@@ -272,7 +319,7 @@ def segment_min(data: jnp.ndarray,
     segment_ids: an array with integer dtype that indicates the segments of
       `data` (along its leading axis) to be min'd over. Values can be repeated
       and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
+      dropped and do not contribute to the result.
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
       jnp.max(-segment_ids))`` but since `num_segments` determines the size of
@@ -285,14 +332,8 @@ def segment_min(data: jnp.ndarray,
     An array with shape ``(num_segments,) + data.shape[1:]`` representing
     the segment mins.
   """
-  if num_segments is None:
-    num_segments = jnp.maximum(jnp.max(segment_ids) + 1, jnp.max(-segment_ids))
-  num_segments = int(num_segments)
-
-  max_value = dtype_max_value(data.dtype)
-  out = jnp.full((num_segments,) + data.shape[1:], max_value, dtype=data.dtype)
-  segment_ids = jnp.mod(segment_ids, num_segments)
-  return out.at[segment_ids].min(data, indices_are_sorted, unique_indices)
+  return jax.ops.segment_min(data, segment_ids, num_segments,
+                             indices_are_sorted, unique_indices)
 
 
 def segment_softmax(logits: jnp.ndarray,
@@ -316,7 +357,7 @@ def segment_softmax(logits: jnp.ndarray,
     segment_ids: an array with integer dtype that indicates the segments of
       `data` (along its leading axis) to be maxed over. Values can be repeated
       and need not be sorted. Values outside of the range [0, num_segments) are
-      wrapped into that range by applying jnp.mod.
+      dropped and do not contribute to the result.
     num_segments: optional, an int with positive value indicating the number of
       segments. The default is ``jnp.maximum(jnp.max(segment_ids) + 1,
       jnp.max(-segment_ids))`` but since ``num_segments`` determines the size of
