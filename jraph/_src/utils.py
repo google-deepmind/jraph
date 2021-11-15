@@ -615,10 +615,10 @@ def pad_with_graphs(graph: gn_graph.GraphsTuple,
 
   padding_graph = gn_graph.GraphsTuple(
       n_node=np.concatenate(
-          [np.array([pad_n_node]),
+          [np.array([pad_n_node], dtype=np.int32),
            np.zeros(pad_n_empty_graph, dtype=np.int32)]),
       n_edge=np.concatenate(
-          [np.array([pad_n_edge]),
+          [np.array([pad_n_edge], dtype=np.int32),
            np.zeros(pad_n_empty_graph, dtype=np.int32)]),
       nodes=tree.tree_map(tree_nodes_pad, graph.nodes),
       edges=tree.tree_map(tree_edges_pad, graph.edges),
