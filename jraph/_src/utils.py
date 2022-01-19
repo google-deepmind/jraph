@@ -706,15 +706,20 @@ def unpad_with_graphs(
   n_padding_node = get_number_of_padding_with_graphs_nodes(padded_graph)
   n_padding_edge = get_number_of_padding_with_graphs_edges(padded_graph)
 
+  def remove_edge_padding(edge_array):
+    if n_padding_edge == 0:
+      return edge_array
+    return edge_array[:-n_padding_edge]
+
   unpadded_graph = gn_graph.GraphsTuple(
       n_node=padded_graph.n_node[:-n_padding_graph],
       n_edge=padded_graph.n_edge[:-n_padding_graph],
       nodes=tree.tree_map(lambda x: x[:-n_padding_node], padded_graph.nodes),
-      edges=tree.tree_map(lambda x: x[:-n_padding_edge], padded_graph.edges),
+      edges=tree.tree_map(remove_edge_padding, padded_graph.edges),
       globals=tree.tree_map(lambda x: x[:-n_padding_graph],
                             padded_graph.globals),
-      senders=padded_graph.senders[:-n_padding_edge],
-      receivers=padded_graph.receivers[:-n_padding_edge],
+      senders=remove_edge_padding(padded_graph.senders),
+      receivers=remove_edge_padding(padded_graph.receivers),
   )
   return unpadded_graph
 

@@ -281,6 +281,19 @@ class GraphTest(test_util.JaxTestCase):
           utils.unpad_with_graphs(utils.pad_with_graphs(g, 101, 200, 11)),
           g, check_dtypes=True)
 
+  def test_pad_unpad_with_graphs_exact_padding(self):
+    """Tests unpad(pad) is identity with random graphs."""
+    g = _get_random_graph(include_globals=True,
+                          include_node_features=True,
+                          include_edge_features=True)
+    recovered_g = utils.unpad_with_graphs(utils.pad_with_graphs(
+        g,
+        n_node=g.n_node.sum() + 1,
+        n_edge=g.n_edge.sum(),
+        n_graph=g.n_node.shape[0] + 1))
+
+    self.assertAllClose(recovered_g, g, check_dtypes=True)
+
   def test_get_number_of_padding_with_graphs_graphs(self):
     """Tests the number of padding graphs calculation."""
     _, graphs_tuple = _get_list_and_batched_graph()
