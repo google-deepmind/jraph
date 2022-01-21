@@ -220,8 +220,9 @@ def _replace_empty_segments_with_constant(aggregated_segments: jnp.ndarray,
                                           num_segments: Optional[int] = None,
                                           constant: float = 0.):
   """Replaces the values of empty segments with constants."""
+  result_shape = (len(segment_ids),) + aggregated_segments.shape[1:]
   num_elements_in_segment = segment_sum(
-      jnp.ones((len(segment_ids),), dtype=jnp.int32),
+      jnp.ones(result_shape, dtype=jnp.int32),
       segment_ids,
       num_segments=num_segments)
   return jnp.where(num_elements_in_segment > 0, aggregated_segments,
