@@ -845,9 +845,13 @@ _DB_EDGE_SHAPE = (4, 3)
 _DB_GLOBAL_SHAPE = (2, 3, 1, 4)
 
 
-def _make_dynamic_batch_graph(add_globals):
-  total_num_edges = sum(_DB_NUM_EDGES)
-  total_num_nodes = sum(_DB_NUM_NODES)
+def _make_dynamic_batch_graph(
+    add_globals,
+    num_nodes=_DB_NUM_NODES,
+    num_edges=_DB_NUM_EDGES,
+):
+  total_num_edges = sum(num_edges)
+  total_num_nodes = sum(num_nodes)
   g_ = _make_nest(
       np.random.normal(size=_DB_GLOBAL_SHAPE)) if add_globals else {}
   return graph.GraphsTuple(
@@ -855,8 +859,8 @@ def _make_dynamic_batch_graph(add_globals):
           np.random.normal(size=(total_num_nodes,) + _DB_NODE_SHAPE)),
       edges=_make_nest(
           np.random.normal(size=(total_num_edges,) + _DB_EDGE_SHAPE)),
-      n_edge=np.array(_DB_NUM_EDGES),
-      n_node=np.array(_DB_NUM_NODES),
+      n_edge=np.array(num_edges),
+      n_node=np.array(num_nodes),
       senders=np.random.randint(
           0, total_num_nodes, size=total_num_edges, dtype=np.int32),
       receivers=np.random.randint(
@@ -871,6 +875,8 @@ class DynamicBatchTest(test_util.JaxTestCase):
     os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=4'
     xla_bridge.get_backend.cache_clear()
     self._global_graph = _make_dynamic_batch_graph(add_globals=True)
+    self._global_small_graph = _make_dynamic_batch_graph(
+        add_globals=True, num_nodes=(5, 7), num_edges=(6, 8))
 
   @parameterized.named_parameters(
       ('graph_with_globals_n_node_hit', True, {
@@ -965,6 +971,16 @@ class DynamicBatchTest(test_util.JaxTestCase):
           iter([self._global_graph]), n_node=50, n_edge=50, n_graph=1)
       self.assertRaisesRegex(
           ValueError, 'The number of graphs*',
+          lambda: next(iterator))
+    with self.subTest('test_too_big_fails_gracefully'):
+      # Ensure that dynamically_batch() returns the accumulated batch before
+      # raising an exception.
+      iterator = utils.dynamically_batch(
+          iter([self._global_small_graph, self._global_graph]),
+          n_node=15, n_edge=15, n_graph=10)
+      next(iterator)
+      self.assertRaisesRegex(
+          RuntimeError, 'Found graph bigger than batch size.*',
           lambda: next(iterator))
 
   def test_not_enough_graphs(self):

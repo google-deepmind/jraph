@@ -971,6 +971,12 @@ def dynamically_batch(
   for element in graphs_tuple_iterator:
     element_nodes, element_edges, element_graphs = _get_graph_size(element)
     if _is_over_batch_size(element, valid_batch_size):
+      # First yield the batched graph so far if exists.
+      if accumulated_graphs:
+        batched_graph = batch_np(accumulated_graphs)
+        yield pad_with_graphs(batched_graph, n_node, n_edge, n_graph)
+
+      # Then report the error.
       graph_size = element_nodes, element_edges, element_graphs
       graph_size = {k: v for k, v in zip(_NUMBER_FIELDS, graph_size)}
       batch_size = {k: v for k, v in zip(_NUMBER_FIELDS, valid_batch_size)}
