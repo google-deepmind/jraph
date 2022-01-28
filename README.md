@@ -2,6 +2,18 @@
 ![logo](images/logo.png)
 # Jraph - A library for graph neural networks in jax.
 
+## New! Interactive Jraph Colabs
+
+We have two new colabs to help you get to grips with Jraph.
+
+The first is an educational colab with an amazing introduction to graph neural networks, graph theory,shows you how to use Jraph to solve a number of problems. Check it out [**here**.](https://github.com/deepmind/educational/blob/f44b133905a96e1887f5909aedcae6811b2c37a3/colabs/summer_schools/intro_to_graph_nets_tutorial_with_jraph.ipynb)
+
+The second is a fully working example with best practices of using Jraph with OGBG-MOLPCBA with some great visualizations. Check it out [**here**.](https://github.com/google/flax/tree/main/examples/ogbg_molpcba) 
+
+Thank you to Lisa Wang & Ameya Daigavane.
+
+## Quick Start
+
 [**Quick Start** ](#quick-start)|[ **Documentation** ](https://jraph.readthedocs.io/en/latest/)
 
 Jraph (pronounced "giraffe") is a lightweight library for working with graph
