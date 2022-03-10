@@ -383,38 +383,49 @@ class GraphTest(parameterized.TestCase):
         jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]))
     np.testing.assert_allclose(result, jnp.array([16, 14, 2, 0, 4]))
 
-  def test_segment_mean(self):
-    result = utils.segment_mean(
-        jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
-    np.testing.assert_allclose(result, jnp.array([4, 14 / 3.0, 2, 0, 4, 0]))
+  @parameterized.parameters((True,), (False,))
+  def test_segment_mean(self, nan_data):
+    data = jnp.arange(9, dtype=jnp.float32)
+    expected_out = jnp.array([4, 14 / 3.0, 2, 0, 4, 0])
+    segment_ids = jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0])
+    if nan_data:
+      data = data.at[0].set(jnp.nan)
+      expected_out = expected_out.at[segment_ids[0]].set(jnp.nan)
+    result = utils.segment_mean(data, segment_ids, 6)
+    np.testing.assert_allclose(result, expected_out)
 
-  def test_segment_variance(self):
-    result = utils.segment_variance(
-        jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
-    np.testing.assert_allclose(
-        result,
-        jnp.stack([
-            jnp.var(jnp.arange(3)),
-            jnp.var(jnp.arange(3, 5)),
-            jnp.var(jnp.arange(5, 8))
-        ]))
+  @parameterized.parameters((True,), (False,))
+  def test_segment_variance(self, nan_data):
+    data = jnp.arange(8, dtype=jnp.float32)
+    expected_out = jnp.stack([jnp.var(jnp.arange(3)),
+                              jnp.var(jnp.arange(3, 5)),
+                              jnp.var(jnp.arange(5, 8))])
+    segment_ids = jnp.array([0, 0, 0, 1, 1, 2, 2, 2])
+    if nan_data:
+      data = data.at[0].set(jnp.nan)
+      expected_out = expected_out.at[segment_ids[0]].set(jnp.nan)
+    result = utils.segment_variance(data, segment_ids, 3)
+    np.testing.assert_allclose(result, expected_out)
 
-  def test_segment_normalize(self):
-    result = utils.segment_normalize(
-        jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
-    np.testing.assert_allclose(
-        result,
-        jnp.concatenate([
-            jax.nn.normalize(jnp.arange(3)),
-            jax.nn.normalize(jnp.arange(3, 5)),
-            jax.nn.normalize(jnp.arange(5, 8))
-        ]),
-        atol=1E-5,
-        rtol=1E-5)
+  @parameterized.parameters((True,), (False,))
+  def test_segment_normalize(self, nan_data):
+    norm = lambda x: (x - jnp.mean(x)) * jax.lax.rsqrt(jnp.var(x))
+    data = jnp.arange(8, dtype=jnp.float32)
+    segment_ids = jnp.array([0, 0, 0, 1, 1, 2, 2, 2])
+    expected_out = jnp.concatenate(
+        [norm(jnp.arange(3, dtype=jnp.float32)),
+         norm(jnp.arange(3, 5, dtype=jnp.float32)),
+         norm(jnp.arange(5, 8, dtype=jnp.float32))])
+    if nan_data:
+      data = data.at[0].set(jnp.nan)
+      expected_out = expected_out.at[:3].set(jnp.nan)
+    result = utils.segment_normalize(data, segment_ids, 3)
+    np.testing.assert_allclose(result, expected_out)
 
   @parameterized.parameters((False, False),
                             (True, False),
                             (True, True),
+                            (False, True),
                             (False, True))
   def test_segment_max(self, indices_are_sorted, unique_indices):
     neg_inf = jnp.iinfo(jnp.int32).min
@@ -452,7 +463,8 @@ class GraphTest(parameterized.TestCase):
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
       np.testing.assert_allclose(result, expected_out)
 
-  @parameterized.parameters((False, False), (True, False), (True, True),
+  @parameterized.parameters((False, False), (True, False),
+                            (True, True), (False, True),
                             (False, True))
   def test_segment_max_or_constant(self, indices_are_sorted, unique_indices):
     if unique_indices:
@@ -678,13 +690,17 @@ class GraphTest(parameterized.TestCase):
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
       np.testing.assert_allclose(result, expected_out)
 
-  def test_segment_softmax(self):
-    data = jnp.arange(9)
+  @parameterized.parameters((True,), (False,))
+  def test_segment_softmax(self, nan_data):
+    data = jnp.arange(9, dtype=jnp.float32)
     segment_ids = jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0])
     num_segments = 6
-    expected_out = np.array([3.1741429e-04, 1.8088353e-03, 1.0000000e+00,
-                             6.3754367e-03, 1.0000000e+00, 4.7108460e-02,
-                             2.6845494e-01, 7.2973621e-01, 9.4619870e-01])
+    expected_out = jnp.array([3.1741429e-04, 1.8088353e-03, 1.0000000e+00,
+                              6.3754367e-03, 1.0000000e+00, 4.7108460e-02,
+                              2.6845494e-01, 7.2973621e-01, 9.4619870e-01])
+    if nan_data:
+      data = data.at[0].set(jnp.nan)
+      expected_out = expected_out.at[np.array([0, 3, 5, 8])].set(jnp.nan)
     with self.subTest('nojit'):
       result = utils.segment_softmax(data, segment_ids, num_segments)
       np.testing.assert_allclose(result, expected_out)

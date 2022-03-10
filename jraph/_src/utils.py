@@ -108,7 +108,8 @@ def segment_mean(data: jnp.ndarray,
       num_segments,
       indices_are_sorted=indices_are_sorted,
       unique_indices=unique_indices)
-  return jnp.nan_to_num(nominator / denominator)
+  return nominator / jnp.maximum(denominator,
+                                 jnp.ones(shape=[], dtype=denominator.dtype))
 
 
 def segment_variance(data: jnp.ndarray,
@@ -140,13 +141,14 @@ def segment_variance(data: jnp.ndarray,
       num_segments,
       indices_are_sorted=indices_are_sorted,
       unique_indices=unique_indices)
+  counts = jnp.maximum(counts, jnp.ones_like(counts))
   variances = segment_sum(
       jnp.power(data - means, 2),
       segment_ids,
       num_segments,
       indices_are_sorted=indices_are_sorted,
       unique_indices=unique_indices) / counts
-  return jnp.nan_to_num(variances)
+  return variances
 
 
 def segment_normalize(data: jnp.ndarray,
@@ -154,7 +156,7 @@ def segment_normalize(data: jnp.ndarray,
                       num_segments: Optional[int] = None,
                       indices_are_sorted: bool = False,
                       unique_indices: bool = False,
-                      eps=1e-5):
+                      eps=1e-8):
   """Normalizes data within each segment.
 
   Args:
@@ -182,8 +184,9 @@ def segment_normalize(data: jnp.ndarray,
       num_segments,
       indices_are_sorted=indices_are_sorted,
       unique_indices=unique_indices)[segment_ids]
-  normalized = (data - means) * lax.rsqrt(variances + eps)
-  return jnp.nan_to_num(normalized)
+  normalized = (data - means) * lax.rsqrt(jnp.maximum(
+      variances, jnp.array(eps, dtype=variances.dtype)))
+  return normalized
 
 
 def segment_max(data: jnp.ndarray,
@@ -379,8 +382,9 @@ def segment_softmax(logits: jnp.ndarray,
   # Then calculate the normalizers
   normalizers = segment_sum(logits, segment_ids, num_segments,
                             indices_are_sorted, unique_indices)
-  softmax = logits / normalizers[segment_ids]
-  return jnp.nan_to_num(softmax)
+  normalizers = normalizers[segment_ids]
+  softmax = logits / normalizers
+  return softmax
 
 
 def partition_softmax(logits: ArrayTree,
