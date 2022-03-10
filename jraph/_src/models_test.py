@@ -17,7 +17,6 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
-from jax import test_util
 import jax.numpy as jnp
 import jax.tree_util as tree
 
@@ -241,7 +240,7 @@ def _get_gat(graphs_tuple):
   return net(graphs_tuple), graphs_tuple
 
 
-class ModelsTest(test_util.JaxTestCase):
+class ModelsTest(parameterized.TestCase):
 
   def _make_nest(self, array):
     """Returns a nest given an array."""
@@ -341,10 +340,12 @@ class ModelsTest(test_util.JaxTestCase):
     _, batched_graphs_tuple = self._get_list_and_batched_graph()
     with self.subTest('nojit'):
       out = network_fn(batched_graphs_tuple)
-      self.assertAllClose(out, batched_graphs_tuple, check_dtypes=True)
+      jax.tree_util.tree_map(np.testing.assert_allclose, out,
+                             batched_graphs_tuple)
     with self.subTest('jit'):
       out = jax.jit(network_fn)(batched_graphs_tuple)
-      self.assertAllClose(out, batched_graphs_tuple, check_dtypes=True)
+      jax.tree_util.tree_map(np.testing.assert_allclose, out,
+                             batched_graphs_tuple)
 
   @parameterized.parameters(_get_graph_network,
                             _get_graph_network_no_node_update,
@@ -368,10 +369,10 @@ class ModelsTest(test_util.JaxTestCase):
     ]:
       with self.subTest(name + '_nojit'):
         out = network_fn(graphs_tuple)
-        self.assertAllClose(out, graphs_tuple, check_dtypes=True)
+        jax.tree_util.tree_map(np.testing.assert_allclose, out, graphs_tuple)
       with self.subTest(name + '_jit'):
         out = jax.jit(network_fn)(graphs_tuple)
-        self.assertAllClose(out, graphs_tuple, check_dtypes=True)
+        jax.tree_util.tree_map(np.testing.assert_allclose, out, graphs_tuple)
 
   @parameterized.parameters(_get_interaction_network,
                             _get_graph_independent,
@@ -389,10 +390,10 @@ class ModelsTest(test_util.JaxTestCase):
         receivers=jnp.array([0, 1, 2, 3, 4, 5, 6, 2, 3, 2, 1, 5]))
     with self.subTest('nojit'):
       out, expected_out = network_fn(batched_graphs_tuple)
-      self.assertAllClose(out, expected_out, check_dtypes=True)
+      jax.tree_util.tree_map(np.testing.assert_allclose, out, expected_out)
     with self.subTest('jit'):
       out, expected_out = jax.jit(network_fn)(batched_graphs_tuple)
-      self.assertAllClose(out, expected_out, check_dtypes=True)
+      jax.tree_util.tree_map(np.testing.assert_allclose, out, expected_out)
 
   def test_graphnetwork_attention_error(self):
     with self.assertRaisesRegex(

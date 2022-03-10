@@ -14,11 +14,11 @@
 # limitations under the License.
 """Tests for jraph.utils."""
 
+import functools
 import os
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
-from jax import test_util
 from jax.lib import xla_bridge
 import jax.numpy as jnp
 import jax.tree_util as tree
@@ -167,13 +167,14 @@ def _get_list_and_batched_graph():
   return list_graphs, batched_graph
 
 
-class GraphTest(test_util.JaxTestCase):
+class GraphTest(parameterized.TestCase):
 
   def test_batch(self):
     """Tests batching of graph."""
     list_graphs_tuple, batched_graphs_tuple = _get_list_and_batched_graph()
     graphs_tuple = utils.batch(list_graphs_tuple)
-    self.assertAllClose(graphs_tuple, batched_graphs_tuple, check_dtypes=False)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graphs_tuple,
+                           batched_graphs_tuple)
 
   def test_unbatch(self):
     """Tests unbatching of graph."""
@@ -181,14 +182,15 @@ class GraphTest(test_util.JaxTestCase):
     graphs_tuples = utils.unbatch(batched_graphs_tuple)
     # The final GraphsTuple does not contain a graph, and so shouldn't be
     # present in the result.
-    self.assertAllClose(
-        graphs_tuples, list_graphs_tuple[:-1], check_dtypes=False)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graphs_tuples,
+                           list_graphs_tuple[:-1])
 
   def test_batch_np(self):
     """Tests batching of graph in numpy."""
     (list_graphs_tuple, batched_graphs_tuple) = _get_list_and_batched_graph()
     graphs_tuple = utils.batch_np(list_graphs_tuple)
-    self.assertAllClose(graphs_tuple, batched_graphs_tuple, check_dtypes=False)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graphs_tuple,
+                           batched_graphs_tuple)
 
   def test_unbatch_np(self):
     """Tests unbatching of graph in numpy."""
@@ -196,8 +198,8 @@ class GraphTest(test_util.JaxTestCase):
     graphs_tuples = utils.unbatch_np(batched_graphs_tuple)
     # The final GraphsTuple does not contain a graph, and so shouldn't be
     # present in the result.
-    self.assertAllClose(
-        graphs_tuples, list_graphs_tuple[:-1], check_dtypes=False)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graphs_tuples,
+                           list_graphs_tuple[:-1])
 
   @parameterized.parameters((True, True, False),
                             (True, False, True),
@@ -212,7 +214,8 @@ class GraphTest(test_util.JaxTestCase):
       g = _get_random_graph(include_globals=include_globals,
                             include_node_features=include_nodes,
                             include_edge_features=include_edges)
-      self.assertAllClose(utils.batch(utils.unbatch(g)), g, check_dtypes=True)
+      jax.tree_util.tree_map(np.testing.assert_allclose,
+                             utils.batch(utils.unbatch(g)), g)
 
     for _ in range(10):
       rg = lambda: _get_random_graph(  # pylint: disable=g-long-lambda
@@ -220,7 +223,7 @@ class GraphTest(test_util.JaxTestCase):
       graphs1 = [rg() for _ in range(np.random.randint(1, 10))]
       graphs2 = utils.unbatch(utils.batch(graphs1))
       for g1, g2 in zip(graphs1, graphs2):
-        self.assertAllClose(g1, g2, check_dtypes=False)
+        jax.tree_util.tree_map(np.testing.assert_allclose, g1, g2)
 
   def test_pad_with_graphs(self):
     """Tests padding of graph."""
@@ -246,8 +249,8 @@ class GraphTest(test_util.JaxTestCase):
             [graphs_tuple.receivers,
              jnp.array([7, 7, 7, 7])]),
     )
-    self.assertAllClose(
-        padded_graphs_tuple, expected_padded_graph, check_dtypes=True)
+    jax.tree_util.tree_map(np.testing.assert_allclose, padded_graphs_tuple,
+                           expected_padded_graph)
 
   def test_unpad(self):
     """Tests unpadding of graph."""
@@ -261,8 +264,8 @@ class GraphTest(test_util.JaxTestCase):
         globals=_make_nest(jnp.arange(8).reshape(4, 2)),
         senders=jnp.array([0, 0, 1, 1, 2, 3, 3]),
         receivers=jnp.array([0, 0, 2, 1, 3, 2, 1]))
-    self.assertAllClose(
-        unpadded_graphs_tuple, expected_unpadded_graph, check_dtypes=True)
+    jax.tree_util.tree_map(np.testing.assert_allclose, unpadded_graphs_tuple,
+                           expected_unpadded_graph)
 
   @parameterized.parameters((True, True, False),
                             (True, False, True),
@@ -277,9 +280,9 @@ class GraphTest(test_util.JaxTestCase):
       g = _get_random_graph(include_globals=include_globals,
                             include_node_features=include_nodes,
                             include_edge_features=include_edges)
-      self.assertAllClose(
-          utils.unpad_with_graphs(utils.pad_with_graphs(g, 101, 200, 11)),
-          g, check_dtypes=True)
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
+          utils.unpad_with_graphs(utils.pad_with_graphs(g, 101, 200, 11)), g)
 
   def test_pad_unpad_with_graphs_exact_padding(self):
     """Tests unpad(pad) is identity with random graphs."""
@@ -292,52 +295,50 @@ class GraphTest(test_util.JaxTestCase):
         n_edge=g.n_edge.sum(),
         n_graph=g.n_node.shape[0] + 1))
 
-    self.assertAllClose(recovered_g, g, check_dtypes=True)
+    jax.tree_util.tree_map(np.testing.assert_allclose, recovered_g, g)
 
   def test_get_number_of_padding_with_graphs_graphs(self):
     """Tests the number of padding graphs calculation."""
     _, graphs_tuple = _get_list_and_batched_graph()
     expected = 3
     with self.subTest('nojit'):
-      self.assertAllClose(
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
           utils.get_number_of_padding_with_graphs_graphs(graphs_tuple),
-          expected,
-          check_dtypes=True)
+          expected)
     with self.subTest('jit'):
-      self.assertAllClose(
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
           jax.jit(utils.get_number_of_padding_with_graphs_graphs)(graphs_tuple),
-          expected,
-          check_dtypes=True)
+          expected)
 
   def test_get_number_of_padding_with_graphs_nodes(self):
     """Tests the number of padding nodes calculation."""
     _, graphs_tuple = _get_list_and_batched_graph()
     expected = 2
     with self.subTest('nojit'):
-      self.assertAllClose(
-          utils.get_number_of_padding_with_graphs_nodes(graphs_tuple),
-          expected,
-          check_dtypes=True)
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
+          utils.get_number_of_padding_with_graphs_nodes(graphs_tuple), expected)
     with self.subTest('jit'):
-      self.assertAllClose(
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
           jax.jit(utils.get_number_of_padding_with_graphs_nodes)(graphs_tuple),
-          expected,
-          check_dtypes=True)
+          expected)
 
   def test_get_number_of_padding_with_graphs_edges(self):
     """Tests the number of padding edges calculation."""
     _, graphs_tuple = _get_list_and_batched_graph()
     expected = 1
     with self.subTest('nojit'):
-      self.assertAllClose(
-          utils.get_number_of_padding_with_graphs_edges(graphs_tuple),
-          expected,
-          check_dtypes=True)
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
+          utils.get_number_of_padding_with_graphs_edges(graphs_tuple), expected)
     with self.subTest('jit'):
-      self.assertAllClose(
+      jax.tree_util.tree_map(
+          np.testing.assert_allclose,
           jax.jit(utils.get_number_of_padding_with_graphs_edges)(graphs_tuple),
-          expected,
-          check_dtypes=True)
+          expected)
 
   def test_get_node_padding_mask(self):
     """Tests construction of node padding mask."""
@@ -345,10 +346,10 @@ class GraphTest(test_util.JaxTestCase):
     expected_mask = jnp.array([1, 1, 1, 1, 1, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_node_padding_mask(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      jax.tree_util.tree_map(np.testing.assert_array_equal, mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_node_padding_mask)(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      jax.tree_util.tree_map(np.testing.assert_array_equal, mask, expected_mask)
 
   def test_get_edge_padding_mask(self):
     """Tests construction of edge padding mask."""
@@ -356,10 +357,10 @@ class GraphTest(test_util.JaxTestCase):
     expected_mask = jnp.array([1, 1, 1, 1, 1, 1, 1, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_edge_padding_mask(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      np.testing.assert_array_equal(mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_edge_padding_mask)(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      np.testing.assert_array_equal(mask, expected_mask)
 
   def test_get_graph_padding_mask(self):
     """Tests construction of graph padding mask."""
@@ -367,43 +368,49 @@ class GraphTest(test_util.JaxTestCase):
     expected_mask = jnp.array([1, 1, 1, 1, 0, 0, 0]).astype(bool)
     with self.subTest('nojit'):
       mask = utils.get_graph_padding_mask(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      np.testing.assert_array_equal(mask, expected_mask)
     with self.subTest('jit'):
       mask = jax.jit(utils.get_graph_padding_mask)(graphs_tuple)
-      self.assertArraysEqual(mask, expected_mask)
+      np.testing.assert_array_equal(mask, expected_mask)
 
   def test_segment_sum(self):
     result = utils.segment_sum(
         jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
-    self.assertAllClose(result, jnp.array([16, 14, 2, 0, 4, 0]),
-                        check_dtypes=False)
+    np.testing.assert_allclose(result, jnp.array([16, 14, 2, 0, 4, 0]))
 
   def test_segment_sum_optional_num_segments(self):
     result = utils.segment_sum(
         jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]))
-    self.assertAllClose(
-        result, jnp.array([16, 14, 2, 0, 4]), check_dtypes=False)
+    np.testing.assert_allclose(result, jnp.array([16, 14, 2, 0, 4]))
 
   def test_segment_mean(self):
     result = utils.segment_mean(
         jnp.arange(9), jnp.array([0, 1, 2, 0, 4, 0, 1, 1, 0]), 6)
-    self.assertAllClose(result, jnp.array([4, 14 / 3.0, 2, 0, 4, 0]),
-                        check_dtypes=False)
+    np.testing.assert_allclose(result, jnp.array([4, 14 / 3.0, 2, 0, 4, 0]))
 
   def test_segment_variance(self):
     result = utils.segment_variance(
         jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
-    self.assertAllClose(result, jnp.stack([jnp.var(jnp.arange(3)),
-                                           jnp.var(jnp.arange(3, 5)),
-                                           jnp.var(jnp.arange(5, 8))]))
+    np.testing.assert_allclose(
+        result,
+        jnp.stack([
+            jnp.var(jnp.arange(3)),
+            jnp.var(jnp.arange(3, 5)),
+            jnp.var(jnp.arange(5, 8))
+        ]))
 
   def test_segment_normalize(self):
     result = utils.segment_normalize(
         jnp.arange(8), jnp.array([0, 0, 0, 1, 1, 2, 2, 2]), 3)
-    self.assertAllClose(result,
-                        jnp.concatenate([jax.nn.normalize(jnp.arange(3)),
-                                         jax.nn.normalize(jnp.arange(3, 5)),
-                                         jax.nn.normalize(jnp.arange(5, 8))]))
+    np.testing.assert_allclose(
+        result,
+        jnp.concatenate([
+            jax.nn.normalize(jnp.arange(3)),
+            jax.nn.normalize(jnp.arange(3, 5)),
+            jax.nn.normalize(jnp.arange(5, 8))
+        ]),
+        atol=1E-5,
+        rtol=1E-5)
 
   @parameterized.parameters((False, False),
                             (True, False),
@@ -434,17 +441,16 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_max(data, segment_ids, num_segments,
                                  indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       result = utils.segment_max(data, segment_ids,
                                  indices_are_sorted=indices_are_sorted,
                                  unique_indices=unique_indices)
       num_unique_segments = jnp.max(segment_ids) + 1
-      self.assertAllClose(result, expected_out[:num_unique_segments],
-                          check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segments])
     with self.subTest('jit'):
       result = jax.jit(utils.segment_max, static_argnums=(2, 3, 4))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
 
   @parameterized.parameters((False, False), (True, False), (True, True),
                             (False, True))
@@ -472,7 +478,7 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_max_or_constant(data, segment_ids, num_segments,
                                              indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       grad = jax.grad(lambda *x: jnp.sum(utils.segment_max_or_constant(*x)))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
       assert np.all(jnp.isfinite(grad))
@@ -482,14 +488,13 @@ class GraphTest(test_util.JaxTestCase):
           indices_are_sorted=indices_are_sorted,
           unique_indices=unique_indices)
       num_unique_segments = jnp.max(segment_ids) + 1
-      self.assertAllClose(
-          result, expected_out[:num_unique_segments], check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segments])
     with self.subTest('jit'):
       result = jax.jit(
           utils.segment_max_or_constant,
           static_argnums=(2, 3, 4))(data, segment_ids, num_segments,
                                     indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       grad_fn = jax.jit(
           jax.grad(lambda *x: jnp.sum(utils.segment_max_or_constant(*x))),
           static_argnums=(2, 3, 4))
@@ -527,19 +532,18 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_max_or_constant(data, segment_ids, num_segments,
                                              indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       result = utils.segment_max_or_constant(
           data,
           segment_ids,
           indices_are_sorted=indices_are_sorted,
           unique_indices=unique_indices)
       num_unique_segments = jnp.max(segment_ids) + 1
-      self.assertAllClose(result, expected_out[:num_unique_segments],
-                          check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segments])
     with self.subTest('jit'):
       result = jax.jit(utils.segment_max_or_constant, static_argnums=(2, 3, 4))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
 
   @parameterized.parameters((False, False),
                             (True, False),
@@ -570,17 +574,16 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_min(data, segment_ids, num_segments,
                                  indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       result = utils.segment_min(data, segment_ids,
                                  indices_are_sorted=indices_are_sorted,
                                  unique_indices=unique_indices)
       num_unique_segment = np.max(segment_ids) + 1
-      self.assertAllClose(
-          result, expected_out[:num_unique_segment], check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segment])
     with self.subTest('jit'):
       result = jax.jit(utils.segment_min, static_argnums=(2, 3, 4))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
 
   @parameterized.parameters((False, False), (True, False), (True, True),
                             (False, True))
@@ -608,7 +611,7 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_min_or_constant(data, segment_ids, num_segments,
                                              indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       grad = jax.grad(lambda *x: jnp.sum(utils.segment_min_or_constant(*x)))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
       assert np.all(jnp.isfinite(grad))
@@ -618,14 +621,13 @@ class GraphTest(test_util.JaxTestCase):
           indices_are_sorted=indices_are_sorted,
           unique_indices=unique_indices)
       num_unique_segments = jnp.max(segment_ids) + 1
-      self.assertAllClose(
-          result, expected_out[:num_unique_segments], check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segments])
     with self.subTest('jit'):
       result = jax.jit(
           utils.segment_min_or_constant,
           static_argnums=(2, 3, 4))(data, segment_ids, num_segments,
                                     indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       grad_fn = jax.jit(
           jax.grad(lambda *x: jnp.sum(utils.segment_min_or_constant(*x))),
           static_argnums=(2, 3, 4))
@@ -663,19 +665,18 @@ class GraphTest(test_util.JaxTestCase):
     with self.subTest('nojit'):
       result = utils.segment_min_or_constant(data, segment_ids, num_segments,
                                              indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       result = utils.segment_min_or_constant(
           data,
           segment_ids,
           indices_are_sorted=indices_are_sorted,
           unique_indices=unique_indices)
       num_unique_segments = jnp.max(segment_ids) + 1
-      self.assertAllClose(result, expected_out[:num_unique_segments],
-                          check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out[:num_unique_segments])
     with self.subTest('jit'):
       result = jax.jit(utils.segment_min_or_constant, static_argnums=(2, 3, 4))(
           data, segment_ids, num_segments, indices_are_sorted, unique_indices)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
 
   def test_segment_softmax(self):
     data = jnp.arange(9)
@@ -686,14 +687,14 @@ class GraphTest(test_util.JaxTestCase):
                              2.6845494e-01, 7.2973621e-01, 9.4619870e-01])
     with self.subTest('nojit'):
       result = utils.segment_softmax(data, segment_ids, num_segments)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
       result = utils.segment_softmax(data, segment_ids)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
     with self.subTest('jit'):
       result = jax.jit(
           utils.segment_softmax, static_argnums=2)(data, segment_ids,
                                                    num_segments)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      np.testing.assert_allclose(result, expected_out)
 
   def test_partition_softmax(self):
     data = jnp.arange(9)
@@ -703,13 +704,19 @@ class GraphTest(test_util.JaxTestCase):
                              0.032059, 0.087144, 0.236883, 0.643914])
     with self.subTest('nojit'):
       result = utils.partition_softmax(data, partitions, sum_partitions)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      jax.tree_util.tree_map(
+          functools.partial(np.testing.assert_allclose, atol=1E-5, rtol=1E-5),
+          result, expected_out)
       result = utils.partition_softmax(data, partitions)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      jax.tree_util.tree_map(
+          functools.partial(np.testing.assert_allclose, atol=1E-5, rtol=1E-5),
+          result, expected_out)
     with self.subTest('jit'):
       result = jax.jit(utils.partition_softmax, static_argnums=2)(
           data, partitions, sum_partitions)
-      self.assertAllClose(result, expected_out, check_dtypes=True)
+      jax.tree_util.tree_map(
+          functools.partial(np.testing.assert_allclose, atol=1E-5, rtol=1E-5),
+          result, expected_out)
 
   @parameterized.named_parameters(('valid_1_no_feat', 1, 1, False, False),
                                   ('valid_5_no_feat', 5, 5, False, False),
@@ -730,7 +737,7 @@ class GraphTest(test_util.JaxTestCase):
         self.assertLen(result.globals, n_graph)
       self.assertLen(result.senders, n_node**2 * n_graph)
       self.assertLen(result.receivers, n_node**2 * n_graph)
-      self.assertAllClose(result.n_node, jnp.array([n_node]*n_graph))
+      np.testing.assert_allclose(result.n_node, jnp.array([n_node] * n_graph))
     with self.subTest('jit'):
       result = jax.jit(utils.get_fully_connected_graph, static_argnums=[0, 1])(
           n_node, n_graph, node_feat, global_feat)
@@ -740,7 +747,7 @@ class GraphTest(test_util.JaxTestCase):
         self.assertLen(result.globals, n_graph)
       self.assertLen(result.senders, n_node**2 * n_graph)
       self.assertLen(result.receivers, n_node**2 * n_graph)
-      self.assertAllClose(result.n_node, jnp.array([n_node]*n_graph))
+      np.testing.assert_allclose(result.n_node, jnp.array([n_node] * n_graph))
 
     with self.subTest('senders_receiver_indices'):
       if n_node > 0:
@@ -757,8 +764,8 @@ class GraphTest(test_util.JaxTestCase):
 
       # Check sender and receivers on each graph in the batch.
       for result_graph in utils.unbatch(result):
-        self.assertAllClose(result_graph.senders, expected_senders)
-        self.assertAllClose(result_graph.receivers, expected_receivers)
+        np.testing.assert_allclose(result_graph.senders, expected_senders)
+        np.testing.assert_allclose(result_graph.receivers, expected_receivers)
 
   @parameterized.named_parameters(('valid_1_no_feat', 1, 1),
                                   ('valid_5_no_feat', 5, 5),
@@ -812,7 +819,7 @@ class GraphTest(test_util.JaxTestCase):
       self.assertSequenceEqual(graph_batch.receivers, [0, 0, 1, 1, 2, 2])
 
 
-class ConcatenatedArgsWrapperTest(test_util.JaxTestCase):
+class ConcatenatedArgsWrapperTest(parameterized.TestCase):
 
   @parameterized.parameters(
       ([], {'a': np.array([10, 2])}, -1),
@@ -835,7 +842,7 @@ class ConcatenatedArgsWrapperTest(test_util.JaxTestCase):
     expected_out = jnp.concatenate(
         list(tree.tree_flatten(args)[0]) + list(tree.tree_flatten(kwargs)[0]),
         axis=axis)
-    self.assertArraysAllClose(out, expected_out, check_dtypes=True)
+    np.testing.assert_allclose(out, expected_out)
 
 
 _DB_NUM_NODES = (10, 15)
@@ -868,7 +875,7 @@ def _make_dynamic_batch_graph(
       globals=g_)
 
 
-class DynamicBatchTest(test_util.JaxTestCase):
+class DynamicBatchTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
@@ -990,7 +997,7 @@ class DynamicBatchTest(test_util.JaxTestCase):
         ValueError, 'The number of graphs*', lambda: next(iterator))
 
 
-class ZeroOutTest(test_util.JaxTestCase):
+class ZeroOutTest(parameterized.TestCase):
 
   def _assert_values_for_graph(self, padded_graph, wrapper):
     # Make padded graph values non zero.
@@ -1007,11 +1014,12 @@ class ZeroOutTest(test_util.JaxTestCase):
     graphs = utils.unbatch(zeroed_padded_graph)
     valid_graph = graphs[0]
     padding_graphs = graphs[1:]
-    tree.tree_multimap(self.assertArraysEqual,
-                       valid_graph.nodes, true_valid_graph.nodes)
+    tree.tree_multimap(np.testing.assert_array_equal, valid_graph.nodes,
+                       true_valid_graph.nodes)
     for padding_graph in padding_graphs:
-      tree.tree_multimap(lambda x: self.assertArraysEqual(x, jnp.zeros_like(x)),
-                         padding_graph.nodes)
+      tree.tree_multimap(
+          lambda x: np.testing.assert_array_equal(x, jnp.zeros_like(x)),
+          padding_graph.nodes)
 
   @parameterized.parameters(True, False)
   def test_zero_padding_values(self, wrapper):
