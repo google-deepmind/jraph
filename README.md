@@ -6,7 +6,7 @@
 
 We have released a distributed graph network implementation that allows you to
 distribute a very large (millions of edges) graph network with explicit edge
-messages across multiple devices. Take a look in experimental!
+messages across multiple devices. [**Check it out!**](https://github.com/deepmind/jraph/tree/master/jraph/experimental)
 
 ## New! Interactive Jraph Colabs
 
