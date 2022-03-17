@@ -2,6 +2,12 @@
 ![logo](images/logo.png)
 # Jraph - A library for graph neural networks in jax.
 
+## New! Support For Large Distributed MPNNs
+
+We have released a distributed graph network implementation that allows you to
+distribute a very large (millions of edges) graph network with explicit edge
+messages across multiple devices. Take a look in experimental!
+
 ## New! Interactive Jraph Colabs
 
 We have two new colabs to help you get to grips with Jraph.
