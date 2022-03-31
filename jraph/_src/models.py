@@ -238,14 +238,24 @@ def GraphNetwork(
   return _ApplyGraphNet
 
 
-InteractionUpdateNodeFn = Callable[..., NodeFeatures]
+InteractionUpdateNodeFn = Callable[
+    [NodeFeatures,
+     Mapping[str, SenderFeatures],
+     Mapping[str, ReceiverFeatures]],
+    NodeFeatures]
+InteractionUpdateNodeFnNoSentEdges = Callable[
+    [NodeFeatures,
+     Mapping[str, ReceiverFeatures]],
+    NodeFeatures]
+
 InteractionUpdateEdgeFn = Callable[
     [EdgeFeatures, SenderFeatures, ReceiverFeatures], EdgeFeatures]
 
 
 def InteractionNetwork(
     update_edge_fn: InteractionUpdateEdgeFn,
-    update_node_fn: InteractionUpdateNodeFn,
+    update_node_fn: Union[InteractionUpdateNodeFn,
+                          InteractionUpdateNodeFnNoSentEdges],
     aggregate_edges_for_nodes_fn: AggregateEdgesToNodesFn = utils.segment_sum,
     include_sent_messages_in_node_update: bool = False):
   """Returns a method that applies a configured InteractionNetwork.
@@ -474,7 +484,7 @@ def GAT(attention_query_fn: GATAttentionQueryFn,
     try:
       sum_n_node = nodes.shape[0]
     except IndexError:
-      raise IndexError('GAT requires node features')
+      raise IndexError('GAT requires node features')  # pylint: disable=raise-missing-from
 
     # First pass nodes through the node updater.
     nodes = attention_query_fn(nodes)
