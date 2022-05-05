@@ -41,8 +41,8 @@ setup(
     keywords='jax graph neural networks python machine learning',
     packages=find_namespace_packages(exclude=['*_test.py']),
     package_data={'jraph': ['ogb_examples/test_data/*']},
+    python_requires='>=3.6',
     install_requires=[
-        'python_version>="3.6"',
         'jax>=0.1.55',
         'jaxlib>=0.1.37',
         'numpy>=1.18.0',
@@ -53,7 +53,6 @@ setup(
                     'ogb_examples': ['dm-haiku>=0.0.2', 'absl-py>=0.9',
                                      'optax>=0.0.1', 'pandas>=1.0.5',
                                      'dm-tree>=0.1.5']},
-    python_requires='>=3.6',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
