@@ -531,7 +531,10 @@ def GraphConvolution(
     add_self_edges: whether to add self edges to nodes in the graph as in the
       paper definition of GCN. Defaults to False.
     symmetric_normalization: whether to use symmetric normalization. Defaults
-      to True.
+      to True. Note that to replicate the fomula of the linked paper, the
+      adjacency matrix must be symmetric. If the adjacency matrix is not
+      symmetric the data is prenormalised by the sender degree matrix and post
+      normalised by the receiver degree matrix.
 
   Returns:
     A method that applies a Graph Convolution layer.
