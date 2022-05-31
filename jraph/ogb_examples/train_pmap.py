@@ -45,6 +45,7 @@ import functools
 import logging
 import pathlib
 import pickle
+from typing import Iterator
 from absl import app
 from absl import flags
 import haiku as hk
@@ -106,42 +107,18 @@ def net_fn(graph: jraph.GraphsTuple) -> jraph.GraphsTuple:
   return net(embedder(graph))
 
 
-def _nearest_bigger_power_of_two(x: int) -> int:
-  """Computes the nearest power of two greater than x for padding."""
-  y = 2
-  while y < x:
-    y *= 2
-  return y
-
-
-def pad_graph_to_nearest_power_of_two(
-    graphs_tuple: jraph.GraphsTuple) -> jraph.GraphsTuple:
-  """Pads a batched `GraphsTuple` to the nearest power of two.
-
-  For example, if a `GraphsTuple` has 7 nodes, 5 edges and 3 graphs, this method
-  would pad the `GraphsTuple` nodes and edges:
-    7 nodes --> 8 nodes (2^3)
-    5 edges --> 8 edges (2^3)
-
-  And since padding is accomplished using `jraph.pad_with_graphs`, an extra
-  graph and node is added:
-    8 nodes --> 9 nodes
-    3 graphs --> 4 graphs
-
-  Args:
-    graphs_tuple: a batched `GraphsTuple` (can be batch size 1).
-
-  Returns:
-    A graphs_tuple batched to the nearest power of two.
-  """
-  # Add 1 since we need at least one padding node for pad_with_graphs.
-  pad_nodes_to = _nearest_bigger_power_of_two(jnp.sum(graphs_tuple.n_node)) + 1
-  pad_edges_to = _nearest_bigger_power_of_two(jnp.sum(graphs_tuple.n_edge))
-  # Add 1 since we need at least one padding graph for pad_with_graphs.
-  # We do not pad to nearest power of two because the batch size is fixed.
-  pad_graphs_to = graphs_tuple.n_node.shape[0] + 1
-  return jraph.pad_with_graphs(graphs_tuple, pad_nodes_to, pad_edges_to,
-                               pad_graphs_to)
+def device_batch(
+    graph_generator: data_utils.DataReader) -> Iterator[jraph.GraphsTuple]:
+  """Batches a set of graphs the size of the number of devices."""
+  num_devices = jax.local_device_count()
+  batch = []
+  for idx, graph in enumerate(graph_generator):
+    if idx % num_devices == num_devices - 1:
+      batch.append(graph)
+      yield jax.tree_map(lambda *x: jnp.stack(x, axis=0), *batch)
+      batch = []
+    else:
+      batch.append(graph)
 
 
 def compute_loss(params, graph, label, net):
@@ -173,7 +150,8 @@ def train(data_path, master_csv_path, split_path, batch_size,
       data_path=data_path,
       master_csv_path=master_csv_path,
       split_path=split_path,
-      batch_size=batch_size)
+      batch_size=batch_size,
+      dynamically_batch=True)
   # Repeat the dataset forever for training.
   reader.repeat()
 
@@ -185,34 +163,32 @@ def train(data_path, master_csv_path, split_path, batch_size,
   # Initialize the network.
   logging.info('Initializing network.')
   params = net.init(jax.random.PRNGKey(42), graph)
+  # Because we are training with multiple devices, params needs to have a
+  # device axis.
+  params = jax.device_put_replicated(params, list(jax.devices()))
   # Initialize the optimizer.
   opt_init, opt_update = optax.adam(1e-4)
-  opt_state = opt_init(params)
+  opt_state = jax.pmap(opt_init)(params)
 
   compute_loss_fn = functools.partial(compute_loss, net=net)
-  # We jit the computation of our loss, since this is the main computation.
-  # Using jax.jit means that we will use a single accelerator. If you want
-  # to use more than 1 accelerator, use jax.pmap. More information can be
-  # found in the jax documentation.
-  compute_loss_fn = jax.jit(jax.value_and_grad(
-      compute_loss_fn, has_aux=True))
-
-  for idx in range(num_training_steps):
-    graph = next(reader)
-    # Jax will re-jit your graphnet every time a new graph shape is encountered.
-    # In the limit, this means a new compilation every training step, which
-    # will result in *extremely* slow training. To prevent this, pad each
-    # batch of graphs to the nearest power of two. Since jax maintains a cache
-    # of compiled programs, the compilation cost is amortized.
-    graph = pad_graph_to_nearest_power_of_two(graph)
-
-    # Extract the label from the graph.
-    label = graph.globals['label']
-    graph = graph._replace(globals={})
-
-    (loss, acc), grad = compute_loss_fn(params, graph, label)
+  # We pmap the computation of our loss, since this is the main computation.
+  # Using jax.pmap means that we will use all available accelerators.
+  # More information can be found in the jax documentation.
+  @functools.partial(jax.pmap, axis_name='device')
+  def update_fn(params, graph, label, opt_state):
+    (loss, acc), grad = jax.value_and_grad(
+        compute_loss_fn, has_aux=True)(params, graph, label)
+    # Average gradients across devices
+    grad = jax.lax.pmean(grad, axis_name='device')
     updates, opt_state = opt_update(grad, opt_state, params)
     params = optax.apply_updates(params, updates)
+    return loss, acc, opt_state, params
+
+  for idx in range(num_training_steps):
+    graph_batch = next(device_batch(reader))
+    label = graph_batch.globals['label']
+    loss, acc, opt_state, params = update_fn(
+        params, graph_batch, label, opt_state)
     if idx % 100 == 0:
       logging.info('step: %s, loss: %s, acc: %s', idx, loss, acc)
   if save_dir is not None:
@@ -231,7 +207,8 @@ def evaluate(data_path, master_csv_path, split_path, save_dir):
       data_path=data_path,
       master_csv_path=master_csv_path,
       split_path=split_path,
-      batch_size=1)
+      batch_size=1,
+      dynamically_batch=True)
   # Transform impure `net_fn` to pure functions with hk.transform.
   net = hk.without_apply_rng(hk.transform(net_fn))
   with pathlib.Path(save_dir, 'molhiv.pkl').open('rb') as fp:
@@ -240,30 +217,19 @@ def evaluate(data_path, master_csv_path, split_path, save_dir):
   accumulated_accuracy = 0
   idx = 0
 
-  # We jit the computation of our loss, since this is the main computation.
-  # Using jax.jit means that we will use a single accelerator. If you want
-  # to use more than 1 accelerator, use jax.pmap. More information can be
-  # found in the jax documentation.
-  compute_loss_fn = jax.jit(functools.partial(compute_loss, net=net))
-  for graph in reader:
-
-    # Jax will re-jit your graphnet every time a new graph shape is encountered.
-    # In the limit, this means a new compilation every training step, which
-    # will result in *extremely* slow training. To prevent this, pad each
-    # batch of graphs to the nearest power of two. Since jax maintains a cache
-    # of compiled programs, the compilation cost is amortized.
-    graph = pad_graph_to_nearest_power_of_two(graph)
-
-    # Extract the labels and remove from the graph.
-    label = graph.globals['label']
-    graph = graph._replace(globals={})
-    loss, acc = compute_loss_fn(params, graph, label)
-    accumulated_accuracy += acc
-    accumulated_loss += loss
-    idx += 1
+  # We pmap the computation of our loss, since this is the main computation.
+  compute_loss_fn = jax.pmap(functools.partial(compute_loss, net=net))
+  for graph_batch in device_batch(reader):
+    label = graph_batch.globals['label']
+    loss, acc = compute_loss_fn(params, graph_batch, label)
+    accumulated_accuracy += jnp.sum(acc)
+    accumulated_loss += jnp.sum(loss)
+    total_num_padding_graphs = jnp.sum(
+        jax.vmap(jraph.get_number_of_padding_with_graphs_graphs)(graph_batch))
+    idx += graph_batch.n_node.size - total_num_padding_graphs
     if idx % 100 == 0:
       logging.info('Evaluated %s graphs', idx)
-  logging.info('Completed evaluation.')
+    logging.info('Completed evaluation.')
   loss = accumulated_loss / idx
   accuracy = accumulated_accuracy / idx
   logging.info('Eval loss: %s, accuracy %s', loss, accuracy)

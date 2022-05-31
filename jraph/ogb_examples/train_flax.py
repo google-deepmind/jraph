@@ -202,7 +202,7 @@ def train(data_path, master_csv_path, split_path, batch_size,
   net = GraphNetwork(mlp_features=(128, 128), latent_size=128)
 
   # Get a candidate graph and label to initialize the network.
-  graph, _ = reader.get_graph_by_idx(0)
+  graph = reader.get_graph_by_idx(0)
 
   # Initialize the network.
   logging.info('Initializing network.')
@@ -211,7 +211,7 @@ def train(data_path, master_csv_path, split_path, batch_size,
   optimizer = jax.device_put(optimizer)
 
   for idx in range(num_training_steps):
-    graph, label = next(reader)
+    graph = next(reader)
     # Jax will re-jit your graphnet every time a new graph shape is encountered.
     # In the limit, this means a new compilation every training step, which
     # will result in *extremely* slow training. To prevent this, pad each
@@ -219,9 +219,10 @@ def train(data_path, master_csv_path, split_path, batch_size,
     # of compiled programs, the compilation cost is amortized.
     graph = pad_graph_to_nearest_power_of_two(graph)
 
-    # Since padding is implemented with pad_with_graphs, an extra graph has
-    # been added to the batch, which means there should be an extra label.
-    label = jnp.concatenate([label, jnp.array([0])])
+    # Remove the label from the input graph/
+    label = graph.globals['label']
+    graph = graph._replace(globals={})
+
     optimizer, scalars = train_step(optimizer, graph, label, net)
     if idx % 100 == 0:
       logging.info('step: %s, loss: %s, acc: %s', idx, scalars['loss'],
@@ -256,7 +257,7 @@ def evaluate(data_path, master_csv_path, split_path, save_dir):
   # found in the jax documentation.
   net = GraphNetwork(mlp_features=[128, 128], latent_size=128)
   compute_loss_fn = jax.jit(functools.partial(compute_loss, net=net))
-  for graph, label in reader:
+  for graph in reader:
 
     # Jax will re-jit your graphnet every time a new graph shape is encountered.
     # In the limit, this means a new compilation every training step, which
@@ -265,9 +266,9 @@ def evaluate(data_path, master_csv_path, split_path, save_dir):
     # of compiled programs, the compilation cost is amortized.
     graph = pad_graph_to_nearest_power_of_two(graph)
 
-    # Since padding is implemented with pad_with_graphs, an extra graph has
-    # been added to the batch, which means there should be an extra label.
-    label = jnp.concatenate([label, jnp.array([0])])
+    # Extract the labels and remove from the graph.
+    label = graph.globals['label']
+    graph = graph._replace(globals={})
     loss, acc = compute_loss_fn(params, graph, label)
     accumulated_accuracy += acc
     accumulated_loss += loss

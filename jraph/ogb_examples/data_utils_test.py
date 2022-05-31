@@ -36,7 +36,7 @@ class DataUtilsTest(parameterized.TestCase):
             )),
         receivers=np.concatenate((np.arange(20), np.arange(20))),
         senders=np.concatenate((np.arange(20), np.arange(20))),
-        globals={},
+        globals={'label': np.array([1], dtype=np.int32)},
         n_node=np.array([10], dtype=np.int32),
         n_edge=np.array([40], dtype=np.int32))
     ogb_path = pathlib.Path(data_utils.__file__).parents[0]
@@ -52,7 +52,7 @@ class DataUtilsTest(parameterized.TestCase):
     self.assertEqual(self._reader.total_num_graphs, 1)
 
   def test_expected_graph(self):
-    graph, _ = next(self._reader)
+    graph = next(self._reader)
     with self.subTest('test_graph_equality'):
       tree.map_structure(
           np.testing.assert_almost_equal, graph, self._test_graph)
@@ -64,7 +64,7 @@ class DataUtilsTest(parameterized.TestCase):
   def test_reader_repeat(self):
     self._reader.repeat()
     next(self._reader)
-    graph, _ = next(self._reader)
+    graph = next(self._reader)
     # One graph in the test dataset so should be the same.
     tree.map_structure(np.testing.assert_almost_equal, graph, self._test_graph)
 
