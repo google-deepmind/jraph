@@ -71,7 +71,7 @@ from jraph._src.utils import with_zero_out_padding_outputs
 from jraph._src.utils import zero_out_padding
 
 
-__version__ = "0.0.2.dev0"
+__version__ = "0.0.5.dev0"
 
 __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "InteractionNetwork", "RelationNetwork", "GraphNetGAT", "GAT",
