@@ -22,6 +22,7 @@ import jax.numpy as jnp
 import jax.tree_util as tree
 from jraph._src import graph as gn_graph
 import numpy as np
+import scipy.sparse
 
 # As of 04/2020 pytype doesn't support recursive types.
 # pytype: disable=not-supported-yet
@@ -1122,3 +1123,33 @@ def with_zero_out_padding_outputs(
     return zero_out_padding(graph_net(graph))
 
   return wrapper
+
+
+def from_scipy_sparse_matrix(A: scipy.sparse.spmatrix):
+  """Creates a `jraph.GraphsTuple` from a scipy sparse matrix.
+  
+  Args:
+    A: A SciPy sparse matrix.
+    
+  Returns:
+    A `jraph.GraphsTuple` graph based on the scipy sparse matrix `A`.
+  """
+  A = A.tocoo()
+  n_node = jnp.asarray([A.shape[1]])
+  n_edge = jnp.asarray([jnp.sum(A.data)])
+  
+  senders = []
+  receivers = []
+  for idx, (sender_idx, receiver_idx) in enumerate(zip(A.row, A.col)):
+    num_edges = A.data[idx]
+    senders += [sender_idx for _ in range(num_edges)]
+    receivers += [receiver_idx for _ in range(num_edges)]
+  
+  return gn_graph.GraphsTuple(
+    nodes=None,
+    edges=None,
+    receivers=jnp.asarray(receivers),
+    senders=jnp.asarray(senders),
+    globals=None,
+    n_node=n_node,
+    n_edge=n_edge)
