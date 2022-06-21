@@ -97,7 +97,7 @@ n_edge = jnp.array([3])
 
 # Optionally you can add `global` information, such as a graph label.
 
-global_context = jnp.array([[1]]) # Same feature dimensions as nodes and edges.
+global_context = jnp.array([[1]])
 graph = jraph.GraphsTuple(nodes=node_features, senders=senders, receivers=receivers,
 edges=edges, n_node=n_node, n_edge=n_edge, globals=global_context)
 ```
