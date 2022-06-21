@@ -1030,10 +1030,10 @@ class ZeroOutTest(parameterized.TestCase):
     graphs = utils.unbatch(zeroed_padded_graph)
     valid_graph = graphs[0]
     padding_graphs = graphs[1:]
-    tree.tree_multimap(np.testing.assert_array_equal, valid_graph.nodes,
-                       true_valid_graph.nodes)
+    tree.tree_map(np.testing.assert_array_equal, valid_graph.nodes,
+                  true_valid_graph.nodes)
     for padding_graph in padding_graphs:
-      tree.tree_multimap(
+      tree.tree_map(
           lambda x: np.testing.assert_array_equal(x, jnp.zeros_like(x)),
           padding_graph.nodes)
 
