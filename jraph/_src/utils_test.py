@@ -1116,7 +1116,7 @@ class AdjacencyMatrixTest(parameterized.TestCase):
     """Tests adjacency matrix is correctly converted to a GraphsTuple."""
     _, sparse_adj_matrices, expected_graphs = _get_list_matrix()
     for A, expected_graph in zip(sparse_adj_matrices, expected_graphs):
-      from_sparse_graph = utils.from_scipy_sparse_matrix(A)
+      from_sparse_graph = utils.sparse_matrix_to_graphs_tuple(A)
       jax.tree_util.tree_map(np.testing.assert_allclose, 
                             from_sparse_graph, expected_graph)
 

@@ -1125,23 +1125,24 @@ def with_zero_out_padding_outputs(
   return wrapper
 
 
-def from_scipy_sparse_matrix(A: scipy.sparse.spmatrix):
+def sparse_matrix_to_graphs_tuple(sparse_matrix: scipy.sparse.spmatrix) -> gn_graph.GraphsTuple:
   """Creates a `jraph.GraphsTuple` from a scipy sparse matrix.
   
   Args:
-    A: A SciPy sparse matrix.
+    sparse_matrix: A SciPy sparse matrix.
     
   Returns:
-    A `jraph.GraphsTuple` graph based on the scipy sparse matrix `A`.
+    A `jraph.GraphsTuple` graph based on the scipy sparse matrix `sparse_matrix`.
   """
-  A = A.tocoo()
-  n_node = jnp.asarray([A.shape[1]])
-  n_edge = jnp.asarray([jnp.sum(A.data)])
+  sparse_matrix = sparse_matrix.tocoo()
+  n_node = jnp.asarray([sparse_matrix.shape[1]])
+  n_edge = jnp.asarray([jnp.sum(sparse_matrix.data)])
   
   senders = []
   receivers = []
-  for idx, (sender_idx, receiver_idx) in enumerate(zip(A.row, A.col)):
-    num_edges = A.data[idx]
+  for idx, (sender_idx,
+            receiver_idx) in enumerate(zip(sparse_matrix.row, sparse_matrix.col)):
+    num_edges = sparse_matrix.data[idx]
     senders += [sender_idx for _ in range(num_edges)]
     receivers += [receiver_idx for _ in range(num_edges)]
   
