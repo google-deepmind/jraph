@@ -826,13 +826,13 @@ class GraphTest(parameterized.TestCase):
         add_self_edges=add_self_edges)
 
     if add_self_edges:
-      self.assertSequenceEqual(
+      np.testing.assert_array_equal(
           graph_batch.senders, [0, 1, 2] * 3)
-      self.assertSequenceEqual(
+      np.testing.assert_array_equal(
           graph_batch.receivers, [0] * 3 + [1] * 3 + [2] * 3)
     else:
-      self.assertSequenceEqual(graph_batch.senders, [1, 2, 2, 0, 0, 1])
-      self.assertSequenceEqual(graph_batch.receivers, [0, 0, 1, 1, 2, 2])
+      np.testing.assert_array_equal(graph_batch.senders, [1, 2, 2, 0, 0, 1])
+      np.testing.assert_array_equal(graph_batch.receivers, [0, 0, 1, 1, 2, 2])
 
 
 class ConcatenatedArgsWrapperTest(parameterized.TestCase):
