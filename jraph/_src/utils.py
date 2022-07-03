@@ -1138,19 +1138,16 @@ def sparse_matrix_to_graphs_tuple(
   Returns:
     A `jraph.GraphsTuple` graph based on the sparse matrix.
   """
-  n_edge = np.asarray([np.sum(values)])
-  repeated_senders = []
-  repeated_receivers = []
-  for idx, (sender_idx,
-            receiver_idx) in enumerate(zip(senders, receivers)):
-    num_edges = values[idx]
-    repeated_senders += [sender_idx for _ in range(num_edges)]
-    repeated_receivers += [receiver_idx for _ in range(num_edges)]
+  # To capture graph with no edges, otherwise np.repeat will raise an error.
+  values = np.array([0]) if values.size == 0 else values
+  n_edge = np.array([np.sum(values)])
+  senders = np.repeat(senders, values)
+  receivers = np.repeat(receivers, values)
   return gn_graph.GraphsTuple(
     nodes=None,
     edges=None,
-    receivers=np.asarray(repeated_receivers),
-    senders=np.asarray(repeated_senders),
+    receivers=receivers,
+    senders=senders,
     globals=None,
     n_node=n_node,
     n_edge=n_edge)
