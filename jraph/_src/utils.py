@@ -1124,33 +1124,34 @@ def with_zero_out_padding_outputs(
 
   return wrapper
 
-
-def sparse_matrix_to_graphs_tuple(sparse_matrix: scipy.sparse.spmatrix) -> gn_graph.GraphsTuple:
-  """Creates a `jraph.GraphsTuple` from a scipy sparse matrix.
+  
+def sparse_matrix_to_graphs_tuple(
+  senders: jnp.ndarray, receivers: jnp.ndarray,
+  values: jnp.ndarray, n_node: jnp.ndarray) -> gn_graph.GraphsTuple:
+  """Creates a `jraph.GraphsTuple` from a sparse matrix in COO format.
   
   Args:
-    sparse_matrix: A SciPy sparse matrix.
+    senders: The row indices of the matrix.
+    receivers: The column indices of the matrix.
+    values: The values of the matrix.
+    n_node: The number of nodes in the graph defined by the sparse matrix.
     
   Returns:
-    A `jraph.GraphsTuple` graph based on the scipy sparse matrix `sparse_matrix`.
+    A `jraph.GraphsTuple` graph based on the sparse matrix.
   """
-  sparse_matrix = sparse_matrix.tocoo()
-  n_node = jnp.asarray([sparse_matrix.shape[1]])
-  n_edge = jnp.asarray([jnp.sum(sparse_matrix.data)])
-  
-  senders = []
-  receivers = []
+  n_edge = np.asarray([np.sum(values)])
+  repeated_senders = []
+  repeated_receivers = []
   for idx, (sender_idx,
-            receiver_idx) in enumerate(zip(sparse_matrix.row, sparse_matrix.col)):
-    num_edges = sparse_matrix.data[idx]
-    senders += [sender_idx for _ in range(num_edges)]
-    receivers += [receiver_idx for _ in range(num_edges)]
-  
+            receiver_idx) in enumerate(zip(senders, receivers)):
+    num_edges = values[idx]
+    repeated_senders += [sender_idx for _ in range(num_edges)]
+    repeated_receivers += [receiver_idx for _ in range(num_edges)]
   return gn_graph.GraphsTuple(
     nodes=None,
     edges=None,
-    receivers=jnp.asarray(receivers),
-    senders=jnp.asarray(senders),
+    receivers=np.asarray(repeated_receivers),
+    senders=np.asarray(repeated_senders),
     globals=None,
     n_node=n_node,
     n_edge=n_edge)
