@@ -22,7 +22,6 @@ import jax.numpy as jnp
 import jax.tree_util as tree
 from jraph._src import graph as gn_graph
 import numpy as np
-import scipy.sparse
 
 # As of 04/2020 pytype doesn't support recursive types.
 # pytype: disable=not-supported-yet

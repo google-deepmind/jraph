@@ -25,7 +25,6 @@ import jax.tree_util as tree
 from jraph._src import graph
 from jraph._src import utils
 import numpy as np
-import scipy.sparse
 
 
 def _get_random_graph(max_n_graph=10,
