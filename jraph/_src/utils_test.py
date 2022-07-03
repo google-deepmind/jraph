@@ -187,13 +187,13 @@ def _get_list_matrix():
   ]
   # Sparse version of the above adjacency matrix.
   sparse_COO_matrices = [
-    # (row, column, values, n_node)
-    (np.array([0]), np.array([0]), np.array([2]), np.array([1])),
-    (np.array([0, 0, 1, 2, 2]), np.array([0, 1, 2, 0, 1]), 
-     np.array([1, 1, 1, 1, 1]), np.array(3)),
-    (np.array([]), np.array([]), np.array([]), np.array(1)),
-    (np.array([]), np.array([]), np.array([]), np.array(0)),
-    (np.array([1]), np.array([0]), np.array([1]), np.array(2)),
+      # (row, column, values, n_node)
+      (np.array([0]), np.array([0]), np.array([2]), np.array([1])),
+      (np.array([0, 0, 1, 2, 2]), np.array([0, 1, 2, 0, 1]),
+       np.array([1, 1, 1, 1, 1]), np.array(3)),
+      (np.array([]), np.array([]), np.array([]), np.array(1)),
+      (np.array([]), np.array([]), np.array([]), np.array(0)),
+      (np.array([1]), np.array([0]), np.array([1]), np.array(2)),
   ]
   expected_graphs = [
       graph.GraphsTuple(
@@ -225,7 +225,7 @@ def _get_list_matrix():
           n_edge=jnp.array([1]),
           nodes=None, edges=None, globals=None,
           senders=jnp.array([1]),
-          receivers=jnp.array([0])),     
+          receivers=jnp.array([0])),
   ]
   return adj_matrices, sparse_COO_matrices, expected_graphs
 
@@ -1119,7 +1119,7 @@ class ZeroOutTest(parameterized.TestCase):
 
 
 class AdjacencyMatrixTest(parameterized.TestCase):
-  
+
   def test_sparse_matrix_to_graphs_tuple(self):
     """Tests sparse COO matrix is correctly converted to a GraphsTuple."""
     _, sparse_adj_matrices, expected_graphs = _get_list_matrix()
@@ -1127,9 +1127,9 @@ class AdjacencyMatrixTest(parameterized.TestCase):
          expected_graph) in zip(sparse_adj_matrices, expected_graphs):
       senders, receivers, values, n_node = sparse_matrix
       from_sparse_graph = utils.\
-        sparse_matrix_to_graphs_tuple(senders, receivers, values, n_node)
-      jax.tree_util.tree_map(np.testing.assert_allclose, 
-                            from_sparse_graph, expected_graph)
+          sparse_matrix_to_graphs_tuple(senders, receivers, values, n_node)
+      jax.tree_util.tree_map(np.testing.assert_allclose,
+                             from_sparse_graph, expected_graph)
 
 
 if __name__ == '__main__':

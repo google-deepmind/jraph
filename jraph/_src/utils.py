@@ -1125,8 +1125,8 @@ def with_zero_out_padding_outputs(
 
   
 def sparse_matrix_to_graphs_tuple(
-  senders: jnp.ndarray, receivers: jnp.ndarray,
-  values: jnp.ndarray, n_node: jnp.ndarray) -> gn_graph.GraphsTuple:
+    senders: jnp.ndarray, receivers: jnp.ndarray,
+    values: jnp.ndarray, n_node: jnp.ndarray) -> gn_graph.GraphsTuple:
   """Creates a `jraph.GraphsTuple` from a sparse matrix in COO format.
   
   Args:
@@ -1144,10 +1144,10 @@ def sparse_matrix_to_graphs_tuple(
   senders = np.repeat(senders, values)
   receivers = np.repeat(receivers, values)
   return gn_graph.GraphsTuple(
-    nodes=None,
-    edges=None,
-    receivers=receivers,
-    senders=senders,
-    globals=None,
-    n_node=n_node,
-    n_edge=n_edge)
+      nodes=None,
+      edges=None,
+      receivers=receivers,
+      senders=senders,
+      globals=None,
+      n_node=n_node,
+      n_edge=n_edge)
