@@ -92,7 +92,7 @@ class ShardedGraphnetTest(parameterized.TestCase):
                                                device_graph_idx)
     out_tuple = sharded_graphnet.graphs_tuple_to_broadcasted_sharded_graphs_tuple(
         in_tuple, num_shards=len(expect_tuple.nodes))
-    tree.tree_multimap(np.testing.assert_almost_equal, out_tuple, expect_tuple)
+    tree.tree_map(np.testing.assert_almost_equal, out_tuple, expect_tuple)
 
   @parameterized.named_parameters(
       ('split_intermediate', [3, 5, 4, 3, 3]),

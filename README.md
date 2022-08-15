@@ -2,6 +2,15 @@
 ![logo](images/logo.png)
 # Jraph - A library for graph neural networks in jax.
 
+
+## New! PMAP Examples and Data Loading.
+
+We have added a pmap [example](https://github.com/deepmind/jraph/tree/master/jraph/ogb_examples/train_pmap.py).
+
+Our friends at instadeep, Jama Hussein Mohamud and Tom Makkink
+have put together a nice guide to using pytorch data loading. Find it [here](https://colab.research.google.com/drive/1_X2su92_nS52RNl4m-WYvmkvUSrFE4xQ).
+
+
 ## New! Support For Large Distributed MPNNs
 
 We have released a distributed graph network implementation that allows you to
@@ -88,7 +97,7 @@ n_edge = jnp.array([3])
 
 # Optionally you can add `global` information, such as a graph label.
 
-global_context = jnp.array([[1]]) # Same feature dimensions as nodes and edges.
+global_context = jnp.array([[1]])
 graph = jraph.GraphsTuple(nodes=node_features, senders=senders, receivers=receivers,
 edges=edges, n_node=n_node, n_edge=n_edge, globals=global_context)
 ```

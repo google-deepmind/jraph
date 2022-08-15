@@ -491,7 +491,7 @@ def _batch(graphs, np_):
 
   def _map_concat(nests):
     concat = lambda *args: np_.concatenate(args)
-    return tree.tree_multimap(concat, *nests)
+    return tree.tree_map(concat, *nests)
 
   return gn_graph.GraphsTuple(
       n_node=np_.concatenate([g.n_node for g in graphs]),
@@ -534,7 +534,7 @@ def _unbatch(graph: gn_graph.GraphsTuple, np_) -> List[gn_graph.GraphsTuple]:
     nest_of_lists = tree.tree_map(concat, nest)
     # pylint: disable=cell-var-from-loop
     list_of_nests = [
-        tree.tree_multimap(lambda _, x: x[i], nest, nest_of_lists)
+        tree.tree_map(lambda _, x: x[i], nest, nest_of_lists)
         for i in range(n_lists)
     ]
     return list_of_nests
