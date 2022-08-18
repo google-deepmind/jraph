@@ -168,8 +168,7 @@ def _get_list_and_batched_graph():
 
 
 def _get_list_matrix():
-  """Returns a list of adjacency matrices, its sparse version
-  and expected `GraphsTuple` corresponding to them.
+  """Returns a list of adjacency matrices, and its sparse and graph versions.
 
   This test-case includes the following corner-cases:
     - single node,
@@ -186,7 +185,7 @@ def _get_list_matrix():
       np.array([[0, 0], [1, 0]]),
   ]
   # Sparse version of the above adjacency matrix.
-  sparse_COO_matrices = [
+  sparse_coo_matrices = [
       # (row, column, values, n_node)
       (np.array([0]), np.array([0]), np.array([2]), np.array([1])),
       (np.array([0, 0, 1, 2, 2]), np.array([0, 1, 2, 0, 1]),
@@ -227,7 +226,7 @@ def _get_list_matrix():
           senders=jnp.array([1]),
           receivers=jnp.array([0])),
   ]
-  return adj_matrices, sparse_COO_matrices, expected_graphs
+  return adj_matrices, sparse_coo_matrices, expected_graphs
 
 
 class GraphTest(parameterized.TestCase):
@@ -1127,8 +1126,8 @@ class AdjacencyMatrixTest(parameterized.TestCase):
     for (sparse_matrix,
          expected_graph) in zip(sparse_adj_matrices, expected_graphs):
       senders, receivers, values, n_node = sparse_matrix
-      from_sparse_graph = utils.\
-          sparse_matrix_to_graphs_tuple(senders, receivers, values, n_node)
+      from_sparse_graph = utils.sparse_matrix_to_graphs_tuple(
+          senders, receivers, values, n_node)
       jax.tree_util.tree_map(np.testing.assert_allclose,
                              from_sparse_graph, expected_graph)
 
