@@ -1123,6 +1123,7 @@ def with_zero_out_padding_outputs(
 
   return wrapper
 
+
 def sparse_matrix_to_graphs_tuple(
     senders: jnp.ndarray, receivers: jnp.ndarray,
     values: jnp.ndarray, n_node: jnp.ndarray) -> gn_graph.GraphsTuple:
