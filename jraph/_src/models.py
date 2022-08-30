@@ -289,9 +289,9 @@ def InteractionNetwork(
   # Similarly, we wrap the update_node_fn to ensure only the expected
   # arguments are passed to the Interaction net.
   if include_sent_messages_in_node_update:
-    wrapped_update_node_fn = lambda n, s, r, g: update_node_fn(n, s, r)
+    wrapped_update_node_fn = lambda n, s, r, g: update_node_fn(n, s, r)  # pytype: disable=wrong-arg-count
   else:
-    wrapped_update_node_fn = lambda n, s, r, g: update_node_fn(n, r)
+    wrapped_update_node_fn = lambda n, s, r, g: update_node_fn(n, r)  # pytype: disable=wrong-arg-count
   return GraphNetwork(
       update_edge_fn=wrapped_update_edge_fn,
       update_node_fn=wrapped_update_node_fn,
