@@ -167,6 +167,68 @@ def _get_list_and_batched_graph():
   return list_graphs, batched_graph
 
 
+def _get_list_matrix():
+  """Returns a list of adjacency matrices, and its sparse and graph versions.
+
+  This test-case includes the following corner-cases:
+    - single node,
+    - multiple nodes,
+    - no edges,
+    - single edge,
+    - and multiple edges.
+  """
+  adj_matrices = [
+      np.array([[2]]),
+      np.array([[1, 1, 0], [0, 0, 1], [1, 1, 0]]),
+      np.array([[0]]),
+      np.array([[]]),
+      np.array([[0, 0], [1, 0]]),
+  ]
+  # Sparse version of the above adjacency matrix.
+  sparse_coo_matrices = [
+      # (row, column, values, n_node)
+      (np.array([0]), np.array([0]), np.array([2]), np.array([1])),
+      (np.array([0, 0, 1, 2, 2]), np.array([0, 1, 2, 0, 1]),
+       np.array([1, 1, 1, 1, 1]), np.array(3)),
+      (np.array([]), np.array([]), np.array([]), np.array(1)),
+      (np.array([]), np.array([]), np.array([]), np.array(0)),
+      (np.array([1]), np.array([0]), np.array([1]), np.array(2)),
+  ]
+  expected_graphs = [
+      graph.GraphsTuple(
+          n_node=jnp.array([1]),
+          n_edge=jnp.array([2]),
+          nodes=None, edges=None, globals=None,
+          senders=jnp.array([0, 0]),
+          receivers=jnp.array([0, 0])),
+      graph.GraphsTuple(
+          n_node=jnp.array([3]),
+          n_edge=jnp.array([5]),
+          nodes=None, edges=None, globals=None,
+          senders=jnp.array([0, 0, 1, 2, 2]),
+          receivers=jnp.array([0, 1, 2, 0, 1])),
+      graph.GraphsTuple(
+          n_node=jnp.array([1]),
+          n_edge=jnp.array([0]),
+          nodes=None, edges=None, globals=None,
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([0]),
+          n_edge=jnp.array([0]),
+          nodes=None, edges=None, globals=None,
+          senders=jnp.array([]),
+          receivers=jnp.array([])),
+      graph.GraphsTuple(
+          n_node=jnp.array([2]),
+          n_edge=jnp.array([1]),
+          nodes=None, edges=None, globals=None,
+          senders=jnp.array([1]),
+          receivers=jnp.array([0])),
+  ]
+  return adj_matrices, sparse_coo_matrices, expected_graphs
+
+
 class GraphTest(parameterized.TestCase):
 
   def test_batch(self):
@@ -1054,6 +1116,20 @@ class ZeroOutTest(parameterized.TestCase):
           utils.pad_with_graphs(
               g, n_node=sum(g.n_node) + 1, n_edge=sum(g.n_edge), n_graph=2),
           wrapper=wrapper)
+
+
+class AdjacencyMatrixTest(parameterized.TestCase):
+
+  def test_sparse_matrix_to_graphs_tuple(self):
+    """Tests sparse COO matrix is correctly converted to a GraphsTuple."""
+    _, sparse_adj_matrices, expected_graphs = _get_list_matrix()
+    for (sparse_matrix,
+         expected_graph) in zip(sparse_adj_matrices, expected_graphs):
+      senders, receivers, values, n_node = sparse_matrix
+      from_sparse_graph = utils.sparse_matrix_to_graphs_tuple(
+          senders, receivers, values, n_node)
+      jax.tree_util.tree_map(np.testing.assert_allclose,
+                             from_sparse_graph, expected_graph)
 
 
 if __name__ == '__main__':
