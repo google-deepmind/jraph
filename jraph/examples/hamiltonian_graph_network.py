@@ -199,7 +199,8 @@ def set_system_state(
     position: np.ndarray,
     momentum: np.ndarray) -> jraph.GraphsTuple:
   """Sets the non-static parameters of the graph (momentum, position)."""
-  nodes = static_graph.nodes.copy(position=position, momentum=momentum)
+  nodes = static_graph.nodes.set("position", position)
+  nodes = nodes.set("momentum", momentum)
   return static_graph._replace(nodes=nodes)
 
 
