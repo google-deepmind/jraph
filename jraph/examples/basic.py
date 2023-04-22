@@ -194,7 +194,7 @@ def run():
   logging.info("Updated graph from single graph %r", updated_graph)
 
   updated_graph = network(nested_graph)
-  logging.info("Updated graph from nested graph %r", nested_graph)
+  logging.info("Updated graph from nested graph %r", updated_graph)
 
   updated_graph = network(implicitly_batched_graph)
   logging.info("Updated graph from implicitly batched graph %r", updated_graph)
