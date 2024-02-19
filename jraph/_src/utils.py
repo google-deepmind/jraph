@@ -815,6 +815,7 @@ def _get_valid_permutation(rng_key:jnp.array,
 def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
                             rng_key: Optional[jnp.array] = None,
                             permutation: Optional[jnp.array] = None, # with integer dtype
+                            return_permutation: Optional[bool] = False,
                             ) -> gn_graph.GraphsTuple:
   """Permutes the order of nodes in the graph.
 
@@ -830,6 +831,8 @@ def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
                A safe permutation array looks like this
                [ permutation(0, n), permutation(n, n+m), ...], where n is the number of nodes
                in the first graph, and m the number nodes in the second graph etc.
+  return_permutation: boolean to indicate if the applied permutation sequence should be returned.
+
  Returns:
    A copy of the original graph, but with permuted nodes, senders, and receivers.
  Raises: Runtime error if rng_key and permutation are specified.
@@ -858,6 +861,8 @@ def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
                                         globals = graph.globals,
                                         n_node = graph.n_node,
                                         n_edge = graph.n_edge,)
+  if return_permutation:
+    return permuted_graph, permutation
   return permuted_graph
 
 
@@ -879,6 +884,7 @@ def get_edge_permuted_graph(graph: gn_graph.GraphsTuple,
                A safe permutation array looks like this
                [ permutation(0, n), permutation(n, n+m), ...], where n is the number of edges
                in the first graph, and m the number edges in the second graph etc.
+  return_permutation: boolean to indicate if the applied permutation sequence should be returned.
  Returns:
    A copy of the original graph, but with permuted edges, senders, and receivers.
  Raises: Runtime error if rng_key and permutation are specified.
@@ -907,6 +913,8 @@ def get_edge_permuted_graph(graph: gn_graph.GraphsTuple,
                                         globals = graph.globals,
                                         n_node = graph.n_node,
                                         n_edge = graph.n_edge,)
+  if return_permutation:
+    return permuted_graph, permutation
   return permuted_graph
 
 

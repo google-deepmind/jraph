@@ -897,6 +897,62 @@ class GraphTest(parameterized.TestCase):
       np.testing.assert_array_equal(graph_batch.receivers, [0, 0, 1, 1, 2, 2])
 
 
+  def test_permute_nodes(self):
+    # Create a ranomdly batched graph
+    graph_a = _get_random_graph()
+    graph_b = _get_random_graph()
+
+    key = random.PRNGKey(0)
+
+    batched_ab = utils.batch([graph_a, graph_b])
+
+    # Apply a node permutation
+    key, subkey = random.split(key)
+    batched_node_mutated_ab, node_mutation = utils.get_node_permuted_graph(batched_ab, rng_key=subkey, return_permutation=True)
+    # We can use argsort to invert a permutation
+    inverted_node_mutation = jnp.argsort(node_mutation)
+
+    node_mutated_a, node_mutated_b = utils.unbatch(batched_node_mutated_ab)
+
+    # After permutation the graphs shouldn't be equal.
+    np.testing.assert_raises(AssertionError,
+                             lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
+                                                            graph_a,
+                                                            note_mutated_a))
+    np.testing.assert_raises(AssertionError,
+                             lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
+                                                            graph_b,
+                                                            note_mutated_b))
+    # Apply an edge permutation
+    key, subkey = random.split(key)
+    batched_edge_and_node_mutated_ab, edge_mutation = utils.get_edge_permuted_graph(batched_node_mutated_ab, rng_key=subkey, return_permutation=True)
+    inverted_edge_mutation = jnp.argsort(edge_mutation)
+
+    edge_mutated_a, edge_mutated_b = utils.unbatch(batched_edge_and_node_mutated_ab)
+
+    # After permutation the graphs shouldn't be equal.
+    # Here we test the the edge mutated once against the node mutated once
+    np.testing.assert_raises(AssertionError,
+                             lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
+                                                            edge_mutated_a,
+                                                            note_mutated_a))
+    np.testing.assert_raises(AssertionError,
+                             lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
+                                                            edge_mutated_b,
+                                                            note_mutated_b))
+
+    # Now we invert both permutations, (the order doesn't matter) and recover the original graphs
+
+    invert_node_graph = utils.get_node_permuted_graph(batched_edge_and_node_mutated_ab, permutation=inverted_node_mutation)
+    invert_edge_graph = utils.get_edge_permuted_graph(invert_edge_graph, permutation=inverted_edge_mutation)
+
+    recover_a, recover_b = utils.unbatch(invert_edge_graph)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graph_a, recover_a)
+    jax.tree_util.tree_map(np.testing.assert_allclose, graph_b, recover_b)
+
+
+
+
 class ConcatenatedArgsWrapperTest(parameterized.TestCase):
 
   @parameterized.parameters(
