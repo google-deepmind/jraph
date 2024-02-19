@@ -799,17 +799,17 @@ def _get_valid_permutation(rng_key:jnp.array,
 
   TODO(02/20/24)InnocentBug, at the moment, I don't know how to make this jittable.
   """
-  node_keys = random.split(rng_key, jnp.sum(n_elements))
+  node_keys = random.split(rng_key, int(jnp.sum(n_elements)))
   permutation = []
-  for i in range(jnp.sum(n_elements)):
+  for i in range(len(n_elements)):
     # Permutation of length and idx of the local element
     local_permutation = random.permutation(node_keys[i], n_elements[i])
     # Adjust permutation index with the element index offset
-    adjusted_permutation = local_permutation + n_elements[i]
+    adjusted_permutation = local_permutation + jnp.sum(n_elements[:i])
     # Stack the global permutation
     permutation += [adjusted_permutation]
 
-  return jnp.concatenate(permutation)
+  return jnp.concatenate(permutation).astype(int)
 
 
 def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
@@ -845,19 +845,19 @@ def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
   if rng_key is not None and permutation is not None:
     raise RuntimeError("Either specify rng_key or permutation, not both.")
 
-  if rng_key:
-    permutation = _get_valid_permutation(rng_key, graph.n_nodes)
+  if rng_key is not None:
+    permutation = _get_valid_permutation(rng_key, graph.n_node)
 
   # A bunch of checks, that make sure the permutation is actually valid.
-  assert jnp.sum(graph.n_nodes) == len(graph.nodes) # Since nodes are present, this should add up
-  assert jnp.max(permutation) == len(graph.nodes)
+  assert int(jnp.sum(graph.n_node)) == int(len(graph.nodes))
+  assert int(jnp.max(permutation)) + 1 == int(len(graph.nodes))
   assert len(jnp.unique(permutation)) == len(graph.nodes)
 
   # Perfrom the actual permutation of the nodes.
   permuted_graph = gn_graph.GraphsTuple(nodes = graph.nodes[permutation],
                                         edges = graph.edges,
-                                        receivers = permutation[graph.receivers],
-                                        senders = permutation[graph.senders],
+                                        receivers = permutation[graph.receivers.astype(int)],
+                                        senders = permutation[graph.senders.astype(int)],
                                         globals = graph.globals,
                                         n_node = graph.n_node,
                                         n_edge = graph.n_edge,)
@@ -869,6 +869,7 @@ def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
 def get_edge_permuted_graph(graph: gn_graph.GraphsTuple,
                             rng_key: Optional[jnp.array] = None,
                             permutation: Optional[jnp.array] = None, # with integer dtype
+                            return_permutation: bool = False,
                             ) -> gn_graph.GraphsTuple:
   """Permutes the order of edges in the graph.
 
@@ -897,13 +898,13 @@ def get_edge_permuted_graph(graph: gn_graph.GraphsTuple,
   if rng_key is not None and permutation is not None:
     raise RuntimeError("Either specify rng_key or permutation, not both.")
 
-  if rng_key:
-    permutation = _get_valid_permutation(rng_key, graph.n_edges)
+  if rng_key is not None:
+    permutation = _get_valid_permutation(rng_key, graph.n_edge)
 
   # A bunch of checks, that make sure the permutation is actually valid.
-  assert jnp.sum(graph.n_edges) == len(graph.edges) # Since nodes are present, this should add up
-  assert jnp.max(permutation) == len(graph.edges)
-  assert len(jnp.unique(permutation)) == len(graph.edges)
+  assert int(jnp.sum(graph.n_edge)) == int(len(graph.edges)) # Since nodes are present, this should add up
+  assert int(jnp.max(permutation))+1 == int(len(graph.edges))
+  assert int(len(jnp.unique(permutation))) == int(len(graph.edges))
 
   # Perfrom the actual permutation of the nodes.
   permuted_graph = gn_graph.GraphsTuple(nodes = graph.nodes,
