@@ -18,6 +18,7 @@ from typing import Any, Callable, Generator, Iterable, Iterator, List, Mapping, 
 
 import jax
 from jax import lax
+from jax import random
 import jax.numpy as jnp
 import jax.tree_util as tree
 from jraph._src import graph as gn_graph
@@ -785,6 +786,128 @@ def get_graph_padding_mask(padded_graph: gn_graph.GraphsTuple) -> ArrayTree:
 def _get_mask(padding_length, full_length):
   valid_length = full_length - padding_length
   return jnp.arange(full_length, dtype=jnp.int32) < valid_length
+
+
+def _get_valid_permutation(rng_key:jnp.array,
+                           n_elements:jnp.array,
+                           ):
+  """Helper function to create individual permutations of elements.
+  For example, this works with nodes (n_elements = graph.n_nodes)
+  and edges (n_elements = graph.n_edges). The result is a permutation,
+  but only elements in the subgraphs are permuted. This leaves batched
+  and padded graphs intact.
+
+  TODO(02/20/24)InnocentBug, at the moment, I don't know how to make this jittable.
+  """
+  node_keys = random.split(rng_key, jnp.sum(n_elements))
+  permutation = []
+  for i in range(jnp.sum(n_elements)):
+    # Permutation of length and idx of the local element
+    local_permutation = random.permutation(node_keys[i], n_elements[i])
+    # Adjust permutation index with the element index offset
+    adjusted_permutation = local_permutation + n_elements[i]
+    # Stack the global permutation
+    permutation += [adjusted_permutation]
+
+  return jnp.concatenate(permutation)
+
+
+def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
+                            rng_key: Optional[jnp.array] = None,
+                            permutation: Optional[jnp.array] = None, # with integer dtype
+                            ) -> gn_graph.GraphsTuple:
+  """Permutes the order of nodes in the graph.
+
+  Args:
+   graph: ``GraphsTuple`` graph to be permuted it can be batched and/or padded.
+   rng_key: random key to obtain permutations. If rng_key is specified a random
+            permutation is computed, this random permutation permutes nodes only
+            inside individual batched (padded) graphs, so they can still be unbatched,
+            or unpadded as usual. Either `rng_key`, or `permutation` has to be specified.
+  permutation: an array with permutation of nodes. This gives explicit control over the
+               permutation, however it also comes with the risk unpadding or unbatching
+               no longer works as expected.
+               A safe permutation array looks like this
+               [ permutation(0, n), permutation(n, n+m), ...], where n is the number of nodes
+               in the first graph, and m the number nodes in the second graph etc.
+ Returns:
+   A copy of the original graph, but with permuted nodes, senders, and receivers.
+ Raises: Runtime error if rng_key and permutation are specified.
+  """
+
+  # If the graph, doesn't have nodes specified, we return the original.
+  if graph.nodes is None:
+      return graph
+
+  if rng_key is not None and permutation is not None:
+    raise RuntimeError("Either specify rng_key or permutation, not both.")
+
+  if rng_key:
+    permutation = _get_valid_permutation(rng_key, graph.n_nodes)
+
+  # A bunch of checks, that make sure the permutation is actually valid.
+  assert jnp.sum(graph.n_nodes) == len(graph.nodes) # Since nodes are present, this should add up
+  assert jnp.max(permutation) == len(graph.nodes)
+  assert len(jnp.unique(permutation)) == len(graph.nodes)
+
+  # Perfrom the actual permutation of the nodes.
+  permuted_graph = gn_graph.GraphsTuple(nodes = graph.nodes[permutation],
+                                        edges = graph.edges,
+                                        receivers = permutation[graph.receivers],
+                                        senders = permutation[graph.senders],
+                                        globals = graph.globals,
+                                        n_node = graph.n_node,
+                                        n_edge = graph.n_edge,)
+  return permuted_graph
+
+
+def get_edge_permuted_graph(graph: gn_graph.GraphsTuple,
+                            rng_key: Optional[jnp.array] = None,
+                            permutation: Optional[jnp.array] = None, # with integer dtype
+                            ) -> gn_graph.GraphsTuple:
+  """Permutes the order of edges in the graph.
+
+  Args:
+   graph: ``GraphsTuple`` graph to be permuted it can be batched and/or padded.
+   rng_key: random key to obtain permutations. If rng_key is specified a random
+            permutation is computed, this random permutation permutes edges only
+            inside individual batched (padded) graphs, so they can still be unbatched,
+            or unpadded as usual. Either `rng_key`, or `permutation` has to be specified.
+  permutation: an array with permutation for the edges. This gives explicit control over the
+               permutation, however it also comes with the risk unpadding or unbatching
+               no longer works as expected.
+               A safe permutation array looks like this
+               [ permutation(0, n), permutation(n, n+m), ...], where n is the number of edges
+               in the first graph, and m the number edges in the second graph etc.
+ Returns:
+   A copy of the original graph, but with permuted edges, senders, and receivers.
+ Raises: Runtime error if rng_key and permutation are specified.
+  """
+
+  # If the graph, doesn't have edges specified, we return the original.
+  if graph.edges is None:
+      return graph
+
+  if rng_key is not None and permutation is not None:
+    raise RuntimeError("Either specify rng_key or permutation, not both.")
+
+  if rng_key:
+    permutation = _get_valid_permutation(rng_key, graph.n_edges)
+
+  # A bunch of checks, that make sure the permutation is actually valid.
+  assert jnp.sum(graph.n_edges) == len(graph.edges) # Since nodes are present, this should add up
+  assert jnp.max(permutation) == len(graph.edges)
+  assert len(jnp.unique(permutation)) == len(graph.edges)
+
+  # Perfrom the actual permutation of the nodes.
+  permuted_graph = gn_graph.GraphsTuple(nodes = graph.nodes,
+                                        edges = graph.edges[permutation],
+                                        receivers = graph.receivers[permutation],
+                                        senders = graph.senders[permutation],
+                                        globals = graph.globals,
+                                        n_node = graph.n_node,
+                                        n_edge = graph.n_edge,)
+  return permuted_graph
 
 
 def concatenated_args(
