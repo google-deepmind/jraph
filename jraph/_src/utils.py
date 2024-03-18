@@ -853,11 +853,13 @@ def get_node_permuted_graph(graph: gn_graph.GraphsTuple,
   assert int(jnp.max(permutation)) + 1 == int(len(graph.nodes))
   assert len(jnp.unique(permutation)) == len(graph.nodes)
 
+  inverse_permutation = jnp.argsort(permutation)
+
   # Perfrom the actual permutation of the nodes.
   permuted_graph = gn_graph.GraphsTuple(nodes = graph.nodes[permutation],
                                         edges = graph.edges,
-                                        receivers = permutation[graph.receivers.astype(int)],
-                                        senders = permutation[graph.senders.astype(int)],
+                                        receivers = inverse_permutation[graph.receivers.astype(int)],
+                                        senders = inverse_permutation[graph.senders.astype(int)],
                                         globals = graph.globals,
                                         n_node = graph.n_node,
                                         n_edge = graph.n_edge,)

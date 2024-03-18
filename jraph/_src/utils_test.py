@@ -908,8 +908,16 @@ class GraphTest(parameterized.TestCase):
                                 min_nodes_per_graph=25,
                                 max_nodes_per_graph=50,
                                 min_edges_per_graph=50,
-                                max_edges_per_graph=75)
-    graph_b = _get_random_graph(max_n_graph=1)
+                                max_edges_per_graph=75,
+                                include_node_features=True,
+                                include_edge_features=True)
+    graph_b = _get_random_graph(max_n_graph=1,
+                                min_nodes_per_graph=25,
+                                max_nodes_per_graph=75,
+                                min_edges_per_graph=50,
+                                max_edges_per_graph=125,
+                                include_node_features=True,
+                                include_edge_features=True)
 
     key = random.PRNGKey(0)
 
@@ -932,6 +940,13 @@ class GraphTest(parameterized.TestCase):
                              lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
                                                             graph_b,
                                                             node_mutated_b))
+    # But if we take the receivers, and senders look up of node features, they are the same
+    np.testing.assert_allclose(graph_a.nodes[graph_a.receivers], node_mutated_a.nodes[node_mutated_a.receivers])
+    np.testing.assert_allclose(graph_a.nodes[graph_a.senders], node_mutated_a.nodes[node_mutated_a.senders])
+    np.testing.assert_allclose(graph_b.nodes[graph_b.receivers], node_mutated_b.nodes[node_mutated_b.receivers])
+    np.testing.assert_allclose(graph_b.nodes[graph_b.senders], node_mutated_b.nodes[node_mutated_b.senders])
+
+
     # Apply an edge permutation
     key, subkey = random.split(key)
     batched_edge_and_node_mutated_ab, edge_mutation = utils.get_edge_permuted_graph(batched_node_mutated_ab, rng_key=subkey, return_permutation=True)
@@ -949,6 +964,7 @@ class GraphTest(parameterized.TestCase):
                              lambda :jax.tree_util.tree_map(np.testing.assert_allclose,
                                                             edge_mutated_b,
                                                             node_mutated_b))
+
 
     # Now we invert both permutations, (the order doesn't matter) and recover the original graphs
 
