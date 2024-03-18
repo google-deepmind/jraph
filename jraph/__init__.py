@@ -70,7 +70,8 @@ from jraph._src.utils import unbatch_np
 from jraph._src.utils import unpad_with_graphs
 from jraph._src.utils import with_zero_out_padding_outputs
 from jraph._src.utils import zero_out_padding
-
+from jraph._src.utils import get_node_permuted_graph
+from jraph._src.utils import get_edge_permuted_graph
 
 __version__ = "0.0.6.dev0"
 
@@ -93,7 +94,8 @@ __all__ = ("ArrayTree", "DeepSets", "GraphConvolution", "GraphMapFeatures",
            "partition_softmax", "concatenated_args",
            "get_fully_connected_graph", "dynamically_batch",
            "with_zero_out_padding_outputs", "zero_out_padding",
-           "sparse_matrix_to_graphs_tuple")
+           "sparse_matrix_to_graphs_tuple",
+           "get_node_permuted_graph", "get_edge_permuted_graph")
 
 #  _________________________________________
 # / Please don't use symbols in `_src` they \
